@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 
-const API_URL = process.env.API_URL || "http://localhost:3001";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 export async function GET(req: Request) {
   const cookie = req.headers.get("cookie") || "";
 
-  const res = await fetch(`${API_URL}/api/transactions`, {
+  const { search } = new URL(req.url);
+
+  const res = await fetch(`${API_URL}/api/transactions${search}`, {
     method: "GET",
     headers: {
       Cookie: cookie,
