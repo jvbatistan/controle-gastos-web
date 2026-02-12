@@ -28,6 +28,8 @@ type Tx = {
   paid: boolean;
   category?: { id: number; name: string } | null;
   card?: { id: number; name: string } | null;
+  installment_number?: number | null;
+  installments_count?: number | null;
 };
 
 function formatDateBR(dateISO: string) {
@@ -106,7 +108,7 @@ export function TransactionTable({
                         </div>
 
                         <div>
-                          <div className="font-medium text-neutral-900">{t.description}</div>
+                          <div className="font-medium text-neutral-900">{t.description} {t.installment_number && t.installments_count ? `(${t.installment_number}/${t.installments_count})` : ""}</div>
                           <div className="text-xs text-neutral-500 mt-0.5">
                             {isExpense ? "Despesa" : "Receita (em construção)"}
                           </div>
