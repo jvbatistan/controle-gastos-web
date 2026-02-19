@@ -18,18 +18,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ArrowDownRight, MoreVertical, Pencil, Trash2, Eye, Copy } from "lucide-react";
+import type { Transaction } from "@/features/transactions/types/transaction.types";
 
-type Tx = {
-  id: number;
-  description: string;
-  value: number;
-  date: string;
-  kind: "income" | "expense";
-  paid: boolean;
-  category?: { id: number; name: string } | null;
-  card?: { id: number; name: string } | null;
-  installment_number?: number | null;
-  installments_count?: number | null;
+type TransactionTableProps = {
+  items: Transaction[];
+  loading: boolean;
+  error?: string | null;
+  onView?: (tx: Transaction) => void;
+  onEdit?: (tx: Transaction) => void;
+  onDelete?: (tx: Transaction) => void;
 };
 
 function formatDateBR(dateISO: string) {
@@ -48,10 +45,11 @@ const statusColors: Record<"paid" | "open", string> = {
 export function TransactionTable({
   items,
   loading,
-}: {
-  items: Tx[];
-  loading: boolean;
-}) {
+  error,
+  onView,
+  onEdit,
+  onDelete,
+}: TransactionTableProps) {
   return (
     <Card>
       <CardHeader>
@@ -79,7 +77,15 @@ export function TransactionTable({
             </TableHeader>
 
             <TableBody>
-              {!loading && items.length === 0 && (
+              {error && (
+                <TableRow>
+                  <TableCell colSpan={7} className="py-10 text-center text-rose-600">
+                    {error}
+                  </TableCell>
+                </TableRow>
+              )}
+
+              {!error && !loading && items.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={7} className="py-10 text-center text-neutral-500">
                     Nenhuma transação encontrada.
@@ -148,21 +154,25 @@ export function TransactionTable({
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => onView?.(t)}>
                             <Eye className="h-4 w-4 mr-2" />
-                            Ver detalhes (em breve)
+                            Ver detalhes
                           </DropdownMenuItem>
-                          <DropdownMenuItem disabled>
+                          <DropdownMenuItem disabled={!onEdit} onClick={() => onEdit?.(t)}>
                             <Pencil className="h-4 w-4 mr-2" />
-                            Editar (em breve)
+                            Editar
                           </DropdownMenuItem>
                           <DropdownMenuItem disabled>
                             <Copy className="h-4 w-4 mr-2" />
                             Duplicar (em breve)
                           </DropdownMenuItem>
-                          <DropdownMenuItem disabled className="text-rose-600">
+                          <DropdownMenuItem
+                            disabled={!onDelete}
+                            onClick={() => onDelete?.(t)}
+                            className="text-rose-600"
+                          >
                             <Trash2 className="h-4 w-4 mr-2" />
-                            Excluir (em breve)
+                            Excluir
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>

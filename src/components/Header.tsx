@@ -1,10 +1,14 @@
 "use client";
 
-import { Bell, Plus, LogOut, User } from "lucide-react";
+import { Bell, Plus, LogOut } from "lucide-react";
 import { logout } from "@/lib/auth";
 import { useRouter } from "next/navigation";
 
-export function Header() {
+type HeaderProps = {
+  onNewTransactionClick?: () => void;
+};
+
+export function Header({ onNewTransactionClick }: HeaderProps) {
   const router = useRouter();
 
   async function handleLogout() {
@@ -29,6 +33,8 @@ export function Header() {
         <div className="flex items-center gap-3">
           {/* Nova Transação */}
           <button
+            type="button"
+            onClick={onNewTransactionClick}
             className="
               inline-flex items-center gap-2
               rounded-lg bg-blue-600 px-4 py-2

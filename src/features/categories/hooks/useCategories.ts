@@ -12,6 +12,7 @@ type UseCategoriesParams = {
 export function useCategories({ enabled, onUnauthorized }: UseCategoriesParams) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!enabled) return;
@@ -21,6 +22,7 @@ export function useCategories({ enabled, onUnauthorized }: UseCategoriesParams) 
     (async () => {
       try {
         setLoading(true);
+        setError(null);
         const result = await fetchCategories(controller.signal);
 
         if (result.status === 401) {
@@ -31,6 +33,8 @@ export function useCategories({ enabled, onUnauthorized }: UseCategoriesParams) 
         setCategories(result.data);
       } catch (err) {
         console.error(err);
+        setCategories([]);
+        setError("Não foi possível carregar as categorias.");
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
@@ -39,5 +43,5 @@ export function useCategories({ enabled, onUnauthorized }: UseCategoriesParams) 
     return () => controller.abort();
   }, [enabled, onUnauthorized]);
 
-  return { categories, loading };
+  return { categories, loading, error };
 }

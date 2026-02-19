@@ -19,6 +19,20 @@ export type TransactionFilters = {
   paid: "all" | "0" | "1";
 };
 
+export type TransactionPayload = {
+  description: string;
+  value: number;
+  date: string;
+  kind: "income" | "expense";
+  source: "card" | "cash" | "bank";
+  paid: boolean;
+  note?: string;
+  responsible?: string;
+  card_id?: number | null;
+  category_id?: number | null;
+  billing_statement?: string | null;
+};
+
 export const defaultTransactionFilters: TransactionFilters = {
   q: "",
   type: "all",

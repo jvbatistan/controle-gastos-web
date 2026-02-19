@@ -5,14 +5,23 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectTriggerHTML } from "@/components/ui/select";
 import { Search, Filter, X } from "lucide-react";
+import type { TransactionFilters as Filters } from "@/features/transactions/types/transaction.types";
 
-type Filters = {
-  q: string;
-  type: "all" | "expense" | "income";
-  categoryId: "all" | string;
-  period: "all" | "today" | "week" | "month" | "last-month";
-  paid: "all" | "0" | "1";
-};
+const TYPE_VALUES: Filters["type"][] = ["all", "expense", "income"];
+const PAID_VALUES: Filters["paid"][] = ["all", "0", "1"];
+
+function toFilterType(value: string): Filters["type"] {
+  const normalized = value || "all";
+  return TYPE_VALUES.includes(normalized as Filters["type"])
+    ? (normalized as Filters["type"])
+    : "all";
+}
+
+function toPaidValue(value: string): Filters["paid"] {
+  return PAID_VALUES.includes(value as Filters["paid"])
+    ? (value as Filters["paid"])
+    : "all";
+}
 
 interface Props {
   filters: Filters;
@@ -44,7 +53,7 @@ export function TransactionFilters({ filters, categories, onChange, onClear }: P
 
           <Select
             value={filters.type === "all" ? "" : filters.type}
-            onValueChange={(v) => onChange({ ...filters, type: (v || "all") as any })}
+            onValueChange={(v) => onChange({ ...filters, type: toFilterType(v) })}
           >
             <SelectTriggerHTML
               placeholder="Tipo"
@@ -89,7 +98,7 @@ export function TransactionFilters({ filters, categories, onChange, onClear }: P
 
           <Select
             value={filters.paid}
-            onValueChange={(v) => onChange({ ...filters, paid: v as any })}
+            onValueChange={(v) => onChange({ ...filters, paid: toPaidValue(v) })}
           >
             <SelectTriggerHTML
               placeholder="Status"

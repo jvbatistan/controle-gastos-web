@@ -22,3 +22,25 @@ export async function GET(req: Request) {
     headers: { "Content-Type": "application/json" },
   });
 }
+
+export async function POST(req: Request) {
+  const cookie = req.headers.get("cookie") || "";
+  const body = await req.text();
+
+  const res = await fetch(`${API_URL}/api/transactions`, {
+    method: "POST",
+    headers: {
+      Cookie: cookie,
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body,
+    cache: "no-store",
+  });
+
+  const text = await res.text();
+  return new NextResponse(text, {
+    status: res.status,
+    headers: { "Content-Type": res.headers.get("content-type") || "application/json" },
+  });
+}

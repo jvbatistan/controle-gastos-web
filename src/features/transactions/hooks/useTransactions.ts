@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { fetchTransactions } from "@/features/transactions/services/transactions.service";
 import {
   Transaction,
@@ -16,6 +16,12 @@ type UseTransactionsParams = {
 export function useTransactions({ filters, enabled, onUnauthorized }: UseTransactionsParams) {
   const [items, setItems] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
+
+  const refetch = useCallback(() => {
+    setReloadToken((prev) => prev + 1);
+  }, []);
 
   useEffect(() => {
     if (!enabled) return;
@@ -25,6 +31,7 @@ export function useTransactions({ filters, enabled, onUnauthorized }: UseTransac
     (async () => {
       try {
         setLoading(true);
+        setError(null);
         const result = await fetchTransactions(filters, controller.signal);
 
         if (result.status === 401) {
@@ -36,6 +43,8 @@ export function useTransactions({ filters, enabled, onUnauthorized }: UseTransac
       } catch (err: unknown) {
         if (!(err instanceof DOMException && err.name === "AbortError")) {
           console.error(err);
+          setItems([]);
+          setError("Não foi possível carregar as transações. Tente novamente.");
         }
       } finally {
         if (!controller.signal.aborted) setLoading(false);
@@ -43,7 +52,7 @@ export function useTransactions({ filters, enabled, onUnauthorized }: UseTransac
     })();
 
     return () => controller.abort();
-  }, [enabled, filters, onUnauthorized]);
+  }, [enabled, filters, onUnauthorized, reloadToken]);
 
-  return { items, loading };
+  return { items, loading, error, refetch };
 }

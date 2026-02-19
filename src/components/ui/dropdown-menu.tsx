@@ -31,9 +31,22 @@ export function DropdownMenuContent({
 export function DropdownMenuItem({
   className,
   children,
+  onClick,
+  disabled,
 }: {
   className?: string;
   children: React.ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
 }) {
-  return <div className={cn("px-2 py-1.5 text-sm", className)}>{children}</div>;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={cn("w-full px-2 py-1.5 text-left text-sm", disabled && "cursor-not-allowed opacity-50", className)}
+    >
+      {children}
+    </button>
+  );
 }
