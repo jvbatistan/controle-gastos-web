@@ -1,18 +1,19 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 type RouteContext = {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 };
 
-export async function PATCH(req: Request, { params }: RouteContext) {
+export async function PATCH(req: NextRequest, context: RouteContext) {
+  const { id } = await context.params;
   const cookie = req.headers.get("cookie") || "";
   const body = await req.text();
 
-  const res = await fetch(`${API_URL}/api/transactions/${params.id}`, {
+  const res = await fetch(`${API_URL}/api/transactions/${id}`, {
     method: "PATCH",
     headers: {
       Cookie: cookie,
@@ -30,10 +31,11 @@ export async function PATCH(req: Request, { params }: RouteContext) {
   });
 }
 
-export async function DELETE(req: Request, { params }: RouteContext) {
+export async function DELETE(req: NextRequest, context: RouteContext) {
+  const { id } = await context.params;
   const cookie = req.headers.get("cookie") || "";
 
-  const res = await fetch(`${API_URL}/api/transactions/${params.id}`, {
+  const res = await fetch(`${API_URL}/api/transactions/${id}`, {
     method: "DELETE",
     headers: {
       Cookie: cookie,
