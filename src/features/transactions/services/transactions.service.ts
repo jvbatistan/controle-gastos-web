@@ -8,12 +8,11 @@ export function buildTransactionsQuery(filters: TransactionFilters) {
   const qs = new URLSearchParams();
   qs.set("limit", "50");
 
-  const q = filters.q.trim();
-  if (q) qs.set("q", q);
-  if (filters.categoryId !== "all") qs.set("category_id", filters.categoryId);
-  if (filters.period !== "all") qs.set("period", filters.period);
-  if (filters.paid !== "all") qs.set("paid", filters.paid);
-  if (filters.type !== "all") qs.set("kind", filters.type);
+  if (filters.cardId !== "all") qs.set("card_id", filters.cardId);
+  if (filters.month !== "all" && filters.year !== "all") {
+    qs.set("month", filters.month);
+    qs.set("year", filters.year);
+  }
 
   return `?${qs.toString()}`;
 }

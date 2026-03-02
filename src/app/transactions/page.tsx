@@ -21,6 +21,7 @@ import {
   type TransactionFiltersType as Filters,
 } from "@/features/transactions";
 import { useCategories } from "@/features/categories";
+import { useCards } from "@/features/cards";
 
 export default function TransactionsPage() {
   const router = useRouter();
@@ -78,6 +79,10 @@ export default function TransactionsPage() {
     enabled: auth.status === "authenticated",
     onUnauthorized: handleUnauthorized,
   });
+  const { cards, error: cardsError } = useCards({
+    enabled: auth.status === "authenticated",
+    onUnauthorized: handleUnauthorized,
+  });
 
   if (auth.status !== "authenticated") {
     return <div className="min-h-screen bg-neutral-50" />;
@@ -108,13 +113,18 @@ export default function TransactionsPage() {
             <TransactionStats items={items} />
             <TransactionFilters
               filters={filters}
-              categories={categories.map((c) => ({ id: String(c.id), name: c.name }))}
+              cards={cards.map((card) => ({ id: String(card.id), name: card.name }))}
               onChange={setFilters}
               onClear={clearFilters}
             />
             {categoriesError && (
               <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
                 {categoriesError}
+              </p>
+            )}
+            {cardsError && (
+              <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+                {cardsError}
               </p>
             )}
             {deleteError && (

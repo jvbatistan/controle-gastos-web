@@ -12,11 +12,9 @@ export type Transaction = {
 };
 
 export type TransactionFilters = {
-  q: string;
-  type: "all" | "expense" | "income";
-  categoryId: "all" | string;
-  period: "all" | "today" | "week" | "month" | "last-month";
-  paid: "all" | "0" | "1";
+  cardId: "all" | "none" | string;
+  month: "all" | string;
+  year: "all" | string;
 };
 
 export type TransactionPayload = {
@@ -34,9 +32,7 @@ export type TransactionPayload = {
 };
 
 export const defaultTransactionFilters: TransactionFilters = {
-  q: "",
-  type: "all",
-  categoryId: "all",
-  period: "all",
-  paid: "all",
+  cardId: "all",
+  month: "all",
+  year: "all",
 };
