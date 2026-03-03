@@ -1,11 +1,18 @@
 import { Card } from "@/features/cards/types/card.types";
+import { api } from "@/lib/api";
 
 export async function fetchCards(signal?: AbortSignal) {
-  const res = await fetch("/api/cards", {
-    cache: "no-store",
-    signal,
-  });
+  try {
+    const data = (await api("/api/cards", {
+      cache: "no-store",
+      signal,
+    })) as Card[];
 
-  if (res.status === 401) return { status: 401 as const, data: [] as Card[] };
-  return { status: res.status, data: (await res.json()) as Card[] };
+    return { status: 200 as const, data };
+  } catch (err) {
+    if (err instanceof Error && err.message.includes("401")) {
+      return { status: 401 as const, data: [] as Card[] };
+    }
+    throw err;
+  }
 }
