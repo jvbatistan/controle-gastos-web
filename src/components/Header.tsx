@@ -26,11 +26,11 @@ export function Header({ onNewTransactionClick }: HeaderProps) {
           <Image
             src="/finch.png"
             alt="Finch Logo"
-            width={42}
-            height={42}
-            className=""
+            width={28}
+            height={28}
+            className="ml-2"
           />
-          <p className="text-xs text-neutral-500">
+          <p className="text-xs text-neutral-500 ml-1">
             Controle suas finanças pessoais
           </p>
         </div>

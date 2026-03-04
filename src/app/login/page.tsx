@@ -43,8 +43,8 @@ export default function LoginPage() {
             <Image
               src="/finch.png"
               alt="Finch Logo"
-              width={48}
-              height={48}
+              width={32}
+              height={32}
               className="ml-2"
             />
           </div>
@@ -106,8 +106,8 @@ export default function LoginPage() {
           <Image
             src="/finch.png"
             alt="Finch Logo"
-            width={32}
-            height={32}
+            width={16}
+            height={16}
             className="inline-block ml-1"
           />
           <p className="text-center text-xs text-neutral-500">. Todos os direitos reservados.</p>
