@@ -37,12 +37,13 @@ export function TransactionFilters({ filters, cards, onChange, onClear }: Props)
   const activeCount =
     (filters.cardId !== "all" ? 1 : 0) +
     (filters.month !== "all" ? 1 : 0) +
-    (filters.year !== "all" ? 1 : 0);
+    (filters.year !== "all" ? 1 : 0) +
+    (filters.limit !== "50" ? 1 : 0);
 
   return (
     <Card>
       <CardContent className="pt-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Select value={filters.cardId} onValueChange={(v) => onChange({ ...filters, cardId: v as Filters["cardId"] })}>
             <SelectTriggerHTML
               placeholder="Cartão"
@@ -70,6 +71,20 @@ export function TransactionFilters({ filters, cards, onChange, onClear }: Props)
               options={[
                 { value: "all", label: "Todos os anos" },
                 ...years.map((year) => ({ value: year, label: year })),
+              ]}
+            />
+          </Select>
+
+          <Select
+            value={filters.limit}
+            onValueChange={(v) => onChange({ ...filters, limit: v as Filters["limit"] })}
+          >
+            <SelectTriggerHTML
+              placeholder="Itens"
+              options={[
+                { value: "50", label: "50 itens" },
+                { value: "100", label: "100 itens" },
+                { value: "200", label: "200 itens" },
               ]}
             />
           </Select>

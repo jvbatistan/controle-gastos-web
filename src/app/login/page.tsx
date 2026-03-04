@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { login } from "@/lib/auth";
 import { useAuth } from "@/lib/useAuth";
+import Image from 'next/image';
 
 export default function LoginPage() {
   const auth = useAuth();
@@ -37,7 +38,17 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         {/* “Header” inspirado no Figma */}
         <div className="mb-6 text-center">
-          <h1 className="text-3xl font-bold text-neutral-900">Finch 🐦</h1>
+          <div className="flex items-center justify-center">
+            <h1 className="text-3xl font-bold text-neutral-900"> Finch </h1>
+            <Image
+              src="/finch.png"
+              alt="Finch Logo"
+              width={48}
+              height={48}
+              className="ml-2"
+            />
+          </div>
+          
           <p className="text-sm text-neutral-500 mt-1">
             Controle suas finanças pessoais
           </p>
@@ -90,9 +101,17 @@ export default function LoginPage() {
           </form>
         </div>
 
-        <p className="text-center text-xs text-neutral-500 mt-6">
-          © {new Date().getFullYear()} Finch 🐦
-        </p>
+        <div className="flex items-center justify-center aling-center mt-6">
+          <p className="text-center text-xs text-neutral-500">© {new Date().getFullYear()} Finch</p>
+          <Image
+            src="/finch.png"
+            alt="Finch Logo"
+            width={32}
+            height={32}
+            className="inline-block ml-1"
+          />
+          <p className="text-center text-xs text-neutral-500">. Todos os direitos reservados.</p>
+        </div>
       </div>
     </div>
   );

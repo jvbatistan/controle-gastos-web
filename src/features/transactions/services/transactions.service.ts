@@ -7,7 +7,7 @@ import { api } from "@/lib/api";
 
 export function buildTransactionsQuery(filters: TransactionFilters) {
   const qs = new URLSearchParams();
-  qs.set("limit", "50");
+  qs.set("limit", filters.limit);
 
   if (filters.cardId !== "all") qs.set("card_id", filters.cardId);
   if (filters.month !== "all" && filters.year !== "all") {

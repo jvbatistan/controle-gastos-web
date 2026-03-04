@@ -3,6 +3,7 @@
 import { Bell, Plus, LogOut } from "lucide-react";
 import { logout } from "@/lib/auth";
 import { useRouter } from "next/navigation";
+import Image from 'next/image';
 
 type HeaderProps = {
   onNewTransactionClick?: () => void;
@@ -20,10 +21,15 @@ export function Header({ onNewTransactionClick }: HeaderProps) {
     <header className="h-[73px] border-b bg-white sticky top-0 z-50">
       <div className="h-full max-w-7xl mx-auto px-6 flex items-center justify-between">
         {/* Logo */}
-        <div>
-          <h1 className="text-xl font-bold text-neutral-900 flex items-center gap-1">
-            Finch <span>🐦</span>
-          </h1>
+        <div className="flex items-center justify-center">
+          <h1 className="text-xl font-bold text-neutral-900 flex items-center"> Finch </h1>
+          <Image
+            src="/finch.png"
+            alt="Finch Logo"
+            width={42}
+            height={42}
+            className=""
+          />
           <p className="text-xs text-neutral-500">
             Controle suas finanças pessoais
           </p>

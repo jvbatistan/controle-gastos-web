@@ -15,6 +15,10 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Finch - Controle de Gastos",
   description: "Controle suas finanças de forma simples e eficiente",
+  icons: {
+    icon: "/favicon.ico",
+    apple: "/apple-touch-icon.png"
+  }
 };
 
 export default function RootLayout({
