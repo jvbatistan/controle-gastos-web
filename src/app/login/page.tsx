@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { login } from "@/lib/auth";
+import { login, me } from "@/lib/auth";
 import { useAuth } from "@/lib/useAuth";
 import Image from 'next/image';
 
@@ -25,9 +25,11 @@ export default function LoginPage() {
 
     try {
       await login(email, password);
+      await me();
       router.replace("/dashboard");
-    } catch {
-      setError("Email ou senha inválidos.");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "";
+      setError(message === "Credenciais inválidas" ? "Email ou senha inválidos." : "Nao foi possivel concluir o login.");
     } finally {
       setLoading(false);
     }
