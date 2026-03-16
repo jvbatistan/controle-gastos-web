@@ -26,9 +26,9 @@ export function TransactionStats({ items }: { items: Tx[] }) {
   const avg = total > 0 ? expenseSum / total : 0;
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <Card>
-        <CardContent className="pt-6">
+        <CardContent className="p-4 pt-4 sm:p-6 sm:pt-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-neutral-500">Total de Transações</p>
@@ -46,7 +46,7 @@ export function TransactionStats({ items }: { items: Tx[] }) {
       </Card>
 
       <Card>
-        <CardContent className="pt-6">
+        <CardContent className="p-4 pt-4 sm:p-6 sm:pt-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-neutral-500">Receitas</p>
@@ -61,7 +61,7 @@ export function TransactionStats({ items }: { items: Tx[] }) {
       </Card>
 
       <Card>
-        <CardContent className="pt-6">
+        <CardContent className="p-4 pt-4 sm:p-6 sm:pt-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-neutral-500">Despesas</p>
@@ -76,7 +76,7 @@ export function TransactionStats({ items }: { items: Tx[] }) {
       </Card>
 
       <Card>
-        <CardContent className="pt-6">
+        <CardContent className="p-4 pt-4 sm:p-6 sm:pt-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-neutral-500">Ticket Médio</p>

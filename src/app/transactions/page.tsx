@@ -29,6 +29,7 @@ export default function TransactionsPage() {
 
   const [filters, setFilters] = useState<Filters>(defaultTransactionFilters);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
 
   const clearFilters = () => setFilters(defaultTransactionFilters);
   const handleUnauthorized = useCallback(() => router.replace("/login"), [router]);
@@ -90,14 +91,17 @@ export default function TransactionsPage() {
 
   return (
     <div className="min-h-screen bg-neutral-50">
-      <Header onNewTransactionClick={() => setIsCreateModalOpen(true)} />
+      <Header
+        onMenuClick={() => setIsMobileNavOpen(true)}
+        onNewTransactionClick={() => setIsCreateModalOpen(true)}
+      />
 
       <div className="flex">
-        <Navigation />
+        <Navigation isMobileOpen={isMobileNavOpen} onClose={() => setIsMobileNavOpen(false)} />
 
-        <main className="flex-1 p-6 lg:p-8">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8">
           <div className="max-w-7xl mx-auto space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h1 className="text-3xl font-bold">Transações</h1>
                 <p className="text-neutral-500 mt-1">

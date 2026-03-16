@@ -42,7 +42,7 @@ export function TransactionFilters({ filters, cards, onChange, onClear }: Props)
 
   return (
     <Card>
-      <CardContent className="pt-6">
+      <CardContent className="p-4 pt-4 sm:p-6 sm:pt-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Select value={filters.cardId} onValueChange={(v) => onChange({ ...filters, cardId: v as Filters["cardId"] })}>
             <SelectTriggerHTML
@@ -90,12 +90,12 @@ export function TransactionFilters({ filters, cards, onChange, onClear }: Props)
           </Select>
         </div>
 
-        <div className="flex items-center justify-between mt-4 pt-4 border-t">
+        <div className="mt-4 flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center text-sm text-neutral-600">
             <Filter className="h-4 w-4 mr-2" />
             <span>Filtros ativos: {activeCount}</span>
           </div>
-          <Button variant="outline" size="sm" onClick={onClear} disabled={activeCount === 0}>
+          <Button variant="outline" size="sm" onClick={onClear} disabled={activeCount === 0} className="w-full sm:w-auto">
             <X className="h-4 w-4 mr-2" />
             Limpar filtros
           </Button>
