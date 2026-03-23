@@ -1,6 +1,23 @@
 import { api } from "@/lib/api";
 
-type MeResponse = { id: number; email: string };
+export type AuthUser = {
+  id: number;
+  name: string;
+  email: string;
+  active: boolean;
+};
+
+type RegisterPayload = {
+  name: string;
+  email: string;
+  password: string;
+  password_confirmation: string;
+};
+
+type UpdateProfilePayload = {
+  name: string;
+  email: string;
+};
 
 export function login(email: string, password: string) {
   return api("/api/login", {
@@ -9,8 +26,22 @@ export function login(email: string, password: string) {
   });
 }
 
-export function me(): Promise<MeResponse> {
+export function register(payload: RegisterPayload): Promise<AuthUser> {
+  return api("/api/register", {
+    method: "POST",
+    body: JSON.stringify({ user: payload }),
+  });
+}
+
+export function me(): Promise<AuthUser> {
   return api("/api/me");
+}
+
+export function updateProfile(payload: UpdateProfilePayload): Promise<AuthUser> {
+  return api("/api/me", {
+    method: "PATCH",
+    body: JSON.stringify({ user: payload }),
+  });
 }
 
 export function logout() {

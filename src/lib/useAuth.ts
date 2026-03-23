@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { me } from "@/lib/auth";
+import { me, type AuthUser } from "@/lib/auth";
 
 type AuthState =
   | { status: "loading" }
-  | { status: "authenticated"; user: { id: number; email: string } }
+  | { status: "authenticated"; user: AuthUser }
   | { status: "unauthenticated" };
 
 export function useAuth() {

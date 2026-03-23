@@ -105,6 +105,8 @@ export function Navigation({ isMobileOpen = false, onClose }: NavigationProps) {
     </div>
   );
 
+  const profileActive = pathname === "/profile";
+
   return (
     <>
       <aside className="sticky top-[73px] hidden h-[calc(100vh-73px)] w-56 border-r border-neutral-200 bg-white lg:block">
@@ -138,20 +140,21 @@ export function Navigation({ isMobileOpen = false, onClose }: NavigationProps) {
 
             <div className="border-t border-neutral-100 p-3">{navLinks}</div>
             <div className="mt-2 border-t border-neutral-100 px-3 pt-4">
-              <div className="flex w-full items-start gap-3 rounded-xl px-4 py-3 text-neutral-400">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg text-neutral-400">
+              <Link
+                href="/profile"
+                onClick={onClose}
+                className={[
+                  "flex w-full items-center gap-3 rounded-xl px-4 py-3 transition-colors",
+                  profileActive
+                    ? "bg-blue-50 text-blue-600 font-medium"
+                    : "text-neutral-700 hover:bg-neutral-50",
+                ].join(" ")}
+              >
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg">
                   <User className="h-5 w-5" />
                 </div>
-                <div className="min-w-0">
-                  <span className="text-sm">Perfil</span>
-                  <div className="mt-1">
-                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-700">
-                      <Hammer className="h-3 w-3" />
-                      Em construção
-                    </span>
-                  </div>
-                </div>
-              </div>
+                <span className="text-sm">Perfil</span>
+              </Link>
               <div className="flex w-full items-start gap-3 rounded-xl px-4 py-3 text-neutral-400">
                 <div className="flex h-9 w-9 items-center justify-center rounded-lg text-neutral-400">
                   <Settings className="h-5 w-5" />

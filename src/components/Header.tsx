@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { Bell, Menu, Plus, Settings, User, LogOut, Hammer } from "lucide-react";
 import { logout } from "@/lib/auth";
+import { useAuth } from "@/lib/useAuth";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
@@ -20,11 +22,15 @@ type HeaderProps = {
 
 export function Header({ onNewTransactionClick, onMenuClick }: HeaderProps) {
   const router = useRouter();
+  const auth = useAuth();
 
   async function handleLogout() {
     await logout();
     router.replace("/login");
   }
+
+  const accountName = auth.status === "authenticated" ? auth.user.name : "Minha Conta";
+  const accountEmail = auth.status === "authenticated" ? auth.user.email : "";
 
   return (
     <header className="sticky top-0 z-50 border-b border-neutral-200 bg-white">
@@ -41,7 +47,7 @@ export function Header({ onNewTransactionClick, onMenuClick }: HeaderProps) {
             </button>
 
             <div className="min-w-0">
-              <a href="/" className="flex gap-2">
+              <Link href="/" className="flex gap-2">
                 <h1 className="truncate text-lg font-bold leading-tight text-neutral-900 sm:text-xl">
                   Finch
                 </h1>
@@ -52,7 +58,7 @@ export function Header({ onNewTransactionClick, onMenuClick }: HeaderProps) {
                   height={28}
                   className="shrink-0"
                 />
-              </a>
+              </Link>
             </div>
             <div className="min-w-0">
               <p className="hidden text-sm text-neutral-500 sm:block">
@@ -92,20 +98,19 @@ export function Header({ onNewTransactionClick, onMenuClick }: HeaderProps) {
                 <User className="h-4 w-4" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
+            <DropdownMenuContent align="end" className="w-64">
+              <DropdownMenuLabel>
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-neutral-900">{accountName}</p>
+                  {accountEmail && <p className="text-xs font-normal text-neutral-500">{accountEmail}</p>}
+                </div>
+              </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem disabled className="items-start text-neutral-400 hover:bg-transparent">
-                <span className="mt-0.5 flex items-center">
+              <DropdownMenuItem asChild>
+                <Link href="/profile" className="cursor-pointer flex">
                   <User className="mr-2 h-4 w-4" />
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-sm">Perfil</span>
-                  <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-700">
-                    <Hammer className="h-3 w-3" />
-                    Em construção
-                  </span>
-                </span>
+                  Perfil
+                </Link>
               </DropdownMenuItem>
               <DropdownMenuItem disabled className="items-start text-neutral-400 hover:bg-transparent">
                 <span className="mt-0.5 flex items-center">

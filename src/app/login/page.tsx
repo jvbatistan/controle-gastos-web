@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { login, me } from "@/lib/auth";
 import { useAuth } from "@/lib/useAuth";
-import Image from 'next/image';
 
 export default function LoginPage() {
   const auth = useAuth();
@@ -36,12 +37,11 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-50 flex items-center justify-center p-6">
+    <div className="flex min-h-screen items-center justify-center bg-neutral-50 p-6">
       <div className="w-full max-w-md">
-        {/* “Header” inspirado no Figma */}
         <div className="mb-6 text-center">
           <div className="flex items-center justify-center">
-            <h1 className="text-3xl font-bold text-neutral-900"> Finch </h1>
+            <h1 className="text-3xl font-bold text-neutral-900">Finch</h1>
             <Image
               src="/finch.png"
               alt="Finch Logo"
@@ -50,16 +50,15 @@ export default function LoginPage() {
               className="ml-2"
             />
           </div>
-          
-          <p className="text-sm text-neutral-500 mt-1">
+
+          <p className="mt-1 text-sm text-neutral-500">
             Controle suas finanças pessoais
           </p>
         </div>
 
-        {/* Card */}
-        <div className="bg-white border rounded-2xl shadow-sm p-6">
+        <div className="rounded-2xl border bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-neutral-900">Entrar</h2>
-          <p className="text-sm text-neutral-500 mt-1">
+          <p className="mt-1 text-sm text-neutral-500">
             Acesse sua conta para continuar.
           </p>
 
@@ -67,7 +66,7 @@ export default function LoginPage() {
             <div className="space-y-2">
               <label className="text-sm font-medium text-neutral-700">Email</label>
               <input
-                className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-300"
+                className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-200"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 type="email"
@@ -79,7 +78,7 @@ export default function LoginPage() {
             <div className="space-y-2">
               <label className="text-sm font-medium text-neutral-700">Senha</label>
               <input
-                className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-300"
+                className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-200"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 type="password"
@@ -96,21 +95,28 @@ export default function LoginPage() {
 
             <button
               disabled={loading}
-              className="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {loading ? "Entrando..." : "Entrar"}
             </button>
           </form>
+
+          <div className="mt-5 rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
+            <span>Novo por aqui? </span>
+            <Link href="/register" className="font-medium text-blue-600 hover:text-blue-700">
+              Criar conta
+            </Link>
+          </div>
         </div>
 
-        <div className="flex items-center justify-center aling-center mt-6">
+        <div className="mt-6 flex items-center justify-center">
           <p className="text-center text-xs text-neutral-500">© {new Date().getFullYear()} Finch</p>
           <Image
             src="/finch.png"
             alt="Finch Logo"
             width={16}
             height={16}
-            className="inline-block ml-1"
+            className="ml-1 inline-block"
           />
           <p className="text-center text-xs text-neutral-500">. Todos os direitos reservados.</p>
         </div>
