@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Check, Sparkles, X } from "lucide-react";
 import { Header } from "@/components/Header";
@@ -33,7 +33,7 @@ function installmentLabel(suggestion: ClassificationSuggestion) {
   return `${transaction.installment_number}/${transaction.installments_count}`;
 }
 
-export default function SuggestionsPage() {
+function SuggestionsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const auth = useAuth();
@@ -270,5 +270,13 @@ export default function SuggestionsPage() {
         </main>
       </div>
     </div>
+  );
+}
+
+export default function SuggestionsPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-neutral-50" />}>
+      <SuggestionsPageContent />
+    </Suspense>
   );
 }
