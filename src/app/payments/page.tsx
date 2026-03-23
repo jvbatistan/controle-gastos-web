@@ -8,6 +8,7 @@ import {
   CircleDollarSign,
   CreditCard,
   DollarSign,
+  X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Header } from "@/components/Header";
@@ -55,6 +56,11 @@ function periodLabel(month: string, year: string) {
   return `${monthLabel}/${year}`;
 }
 
+type PaymentConfirmation =
+  | { kind: "statement"; statementId: number; cardName: string; amount: number }
+  | { kind: "loose-expense"; transactionId: number; description: string; amount: number }
+  | { kind: "loose-expenses"; count: number; totalAmount: number; period: string };
+
 function statementGradient(name: string) {
   const gradients = [
     "from-violet-600 to-fuchsia-500",
@@ -75,6 +81,7 @@ export default function PaymentsPage() {
   const [year, setYear] = useState(String(currentYear));
   const [message, setMessage] = useState<string | null>(null);
   const [submittingKey, setSubmittingKey] = useState<string | null>(null);
+  const [confirmation, setConfirmation] = useState<PaymentConfirmation | null>(null);
 
   const handleUnauthorized = useCallback(() => router.replace("/login"), [router]);
 
@@ -105,7 +112,7 @@ export default function PaymentsPage() {
   const totalLooseExpenses = Number(looseExpenses?.total_amount ?? 0);
   const isSubmittingLooseExpenses = submittingKey === "loose-expenses" || submittingKey?.startsWith("loose-expense-") === true;
 
-  async function handlePayStatement(statementId: number) {
+  async function submitPayStatement(statementId: number) {
     try {
       setSubmittingKey(`statement-${statementId}`);
       setMessage(null);
@@ -123,7 +130,7 @@ export default function PaymentsPage() {
     }
   }
 
-  async function handlePayLooseExpense(transactionId: number, description: string) {
+  async function submitPayLooseExpense(transactionId: number, description: string) {
     try {
       setSubmittingKey(`loose-expense-${transactionId}`);
       setMessage(null);
@@ -141,7 +148,7 @@ export default function PaymentsPage() {
     }
   }
 
-  async function handlePayLooseExpenses() {
+  async function submitPayLooseExpenses() {
     try {
       setSubmittingKey("loose-expenses");
       setMessage(null);
@@ -157,6 +164,25 @@ export default function PaymentsPage() {
     } finally {
       setSubmittingKey(null);
     }
+  }
+
+  async function handleConfirmPayment() {
+    if (!confirmation) return;
+
+    const current = confirmation;
+    setConfirmation(null);
+
+    if (current.kind === "statement") {
+      await submitPayStatement(current.statementId);
+      return;
+    }
+
+    if (current.kind === "loose-expense") {
+      await submitPayLooseExpense(current.transactionId, current.description);
+      return;
+    }
+
+    await submitPayLooseExpenses();
   }
 
   if (auth.status !== "authenticated") {
@@ -344,7 +370,12 @@ export default function PaymentsPage() {
                                 </Button>
                               ) : (
                                 <Button
-                                  onClick={() => void handlePayStatement(statement.id)}
+                                  onClick={() => setConfirmation({
+                                    kind: "statement",
+                                    statementId: statement.id,
+                                    cardName: statement.card.name,
+                                    amount: Number(statement.remaining_amount),
+                                  })}
                                   disabled={isSubmitting}
                                   className="w-full bg-neutral-900 text-white hover:bg-neutral-800 sm:w-auto"
                                 >
@@ -381,7 +412,12 @@ export default function PaymentsPage() {
                           <p className="text-sm opacity-90">Você pode marcar cada despesa individualmente ou quitar tudo de uma vez.</p>
                           <Button
                             variant="outline"
-                            onClick={() => void handlePayLooseExpenses()}
+                            onClick={() => setConfirmation({
+                              kind: "loose-expenses",
+                              count: looseExpenses.transactions_count,
+                              totalAmount: totalLooseExpenses,
+                              period: periodLabel(month, year),
+                            })}
                             disabled={isSubmittingLooseExpenses}
                             className="border-white/70 bg-white text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
                           >
@@ -419,7 +455,12 @@ export default function PaymentsPage() {
                               <div className="text-lg font-bold text-neutral-900">{formatBRL(transaction.value)}</div>
                               <Button
                                 size="sm"
-                                onClick={() => void handlePayLooseExpense(transaction.id, transaction.description)}
+                                onClick={() => setConfirmation({
+                                  kind: "loose-expense",
+                                  transactionId: transaction.id,
+                                  description: transaction.description,
+                                  amount: Number(transaction.value),
+                                })}
                                 disabled={isSubmittingLooseExpenses}
                                 className="bg-emerald-600 text-white hover:bg-emerald-700"
                               >
@@ -437,6 +478,57 @@ export default function PaymentsPage() {
           </div>
         </main>
       </div>
+
+      {confirmation && (
+        <div className="fixed inset-0 z-[70] overflow-y-auto bg-black/40 px-4 py-6">
+          <div className="mx-auto flex min-h-full w-full max-w-lg items-center justify-center">
+            <div className="w-full overflow-hidden rounded-3xl bg-white shadow-2xl">
+              <div className="border-b border-neutral-200 px-5 py-4 sm:px-6">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h2 className="text-xl font-semibold text-neutral-900">
+                      {confirmation.kind === "statement"
+                        ? "Confirmar pagamento da fatura"
+                        : confirmation.kind === "loose-expense"
+                          ? "Confirmar pagamento da despesa"
+                          : "Confirmar pagamento em lote"}
+                    </h2>
+                    <p className="mt-1 text-sm text-neutral-500">
+                      {confirmation.kind === "statement"
+                        ? `Você está prestes a quitar a fatura do cartão ${confirmation.cardName} no valor de ${formatBRL(confirmation.amount)}.`
+                        : confirmation.kind === "loose-expense"
+                          ? `Você está prestes a marcar a despesa ${confirmation.description} como paga no valor de ${formatBRL(confirmation.amount)}.`
+                          : `Você está prestes a quitar ${confirmation.count} despesa(s) avulsa(s) pendentes de ${confirmation.period}, totalizando ${formatBRL(confirmation.totalAmount)}.`}
+                    </p>
+                  </div>
+                  <Button type="button" variant="outline" size="sm" onClick={() => setConfirmation(null)} disabled={submittingKey !== null}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+
+              <div className="px-5 py-5 sm:px-6">
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                  Essa ação altera o status de pagamento e deve ser confirmada com atenção.
+                </div>
+
+                <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:justify-end">
+                  <Button type="button" variant="outline" onClick={() => setConfirmation(null)} disabled={submittingKey !== null}>
+                    Cancelar
+                  </Button>
+                  <Button type="button" onClick={() => void handleConfirmPayment()} disabled={submittingKey !== null} className="bg-neutral-900 text-white hover:bg-neutral-800">
+                    {confirmation.kind === "statement"
+                      ? "Confirmar pagamento da fatura"
+                      : confirmation.kind === "loose-expense"
+                        ? "Confirmar pagamento da despesa"
+                        : "Confirmar pagamento em lote"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

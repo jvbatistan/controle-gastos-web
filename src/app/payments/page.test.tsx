@@ -88,6 +88,7 @@ describe("PaymentsPage", () => {
     render(<PaymentsPage />);
 
     await user.click(screen.getByRole("button", { name: /Pagar fatura/i }));
+    await user.click(screen.getByRole("button", { name: /Confirmar pagamento da fatura/i }));
 
     await waitFor(() => {
       expect(payCardStatement).toHaveBeenCalledWith(1);
@@ -96,12 +97,30 @@ describe("PaymentsPage", () => {
     });
   });
 
+  it("opens a confirmation modal before paying a loose expense", async () => {
+    const user = userEvent.setup();
+    render(<PaymentsPage />);
+
+    await user.click(screen.getByRole("button", { name: /Avulsas/i }));
+    await user.click(screen.getAllByRole("button", { name: /Pagar despesa/i })[0]);
+
+    expect(screen.getByText(/Essa ação altera o status de pagamento/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Confirmar pagamento da despesa/i })).toBeInTheDocument();
+    expect(payLooseExpense).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: /Cancelar/i }));
+
+    expect(screen.queryByRole("button", { name: /Confirmar pagamento da despesa/i })).not.toBeInTheDocument();
+    expect(payLooseExpense).not.toHaveBeenCalled();
+  });
+
   it("switches to loose expenses and pays one expense at a time", async () => {
     const user = userEvent.setup();
     render(<PaymentsPage />);
 
     await user.click(screen.getByRole("button", { name: /Avulsas/i }));
     await user.click(screen.getAllByRole("button", { name: /Pagar despesa/i })[0]);
+    await user.click(screen.getByRole("button", { name: /Confirmar pagamento da despesa/i }));
 
     await waitFor(() => {
       expect(payLooseExpense).toHaveBeenCalledWith(1, expect.any(Number), expect.any(Number));
@@ -116,6 +135,7 @@ describe("PaymentsPage", () => {
 
     await user.click(screen.getByRole("button", { name: /Avulsas/i }));
     await user.click(screen.getByRole("button", { name: /Pagar todas as despesas/i }));
+    await user.click(screen.getByRole("button", { name: /Confirmar pagamento em lote/i }));
 
     await waitFor(() => {
       expect(payLooseExpenses).toHaveBeenCalledWith(expect.any(Number), expect.any(Number));
@@ -138,6 +158,7 @@ describe("PaymentsPage", () => {
     expect(itemButtons[1]).toBeEnabled();
 
     await user.click(itemButtons[0]);
+    await user.click(screen.getByRole("button", { name: /Confirmar pagamento da despesa/i }));
 
     await waitFor(() => {
       expect(payLooseExpense).toHaveBeenCalledWith(1, expect.any(Number), expect.any(Number));
