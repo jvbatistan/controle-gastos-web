@@ -8,6 +8,7 @@ import {
   Home,
   CreditCard,
   PieChart,
+  Sparkles,
   TrendingUp,
   Calendar,
   Settings,
@@ -19,6 +20,7 @@ import {
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: Home, enabled: true },
   { href: "/transactions", label: "Transações", icon: CreditCard, enabled: true },
+  { href: "/suggestions", label: "Sugestões", icon: Sparkles, enabled: true },
   { href: "", label: "Categorias", icon: PieChart, enabled: false },
   { href: "", label: "Investimentos", icon: TrendingUp, enabled: false },
   { href: "", label: "Planejamento", icon: Calendar, enabled: false },

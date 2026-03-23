@@ -46,17 +46,14 @@ export default function TransactionsPage() {
     console.info("edit transaction", tx.id);
   }, []);
   const handleReviewClassification = useCallback((tx: Transaction) => {
-    if (tx.classification?.status === "suggestion_pending") {
-      setClassificationNotice(
-        `A transação "${tx.description}" está com sugestão pendente. O próximo passo é ligar essa ação à tela de sugestões.`
-      );
+    const suggestionId = tx.classification?.suggestion?.id;
+    if (suggestionId) {
+      router.push(`/suggestions?suggestion=${suggestionId}`);
       return;
     }
 
-    setClassificationNotice(
-      `A transação "${tx.description}" ainda não foi classificada. O próximo passo é ligar essa ação à tela de sugestões.`
-    );
-  }, []);
+    router.push("/suggestions");
+  }, [router]);
 
   useEffect(() => {
     if (auth.status === "unauthenticated") router.replace("/login");
