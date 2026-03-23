@@ -106,8 +106,8 @@ export function Header({ onNewTransactionClick, onMenuClick }: HeaderProps) {
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link href="/profile" className="cursor-pointer flex">
+              <DropdownMenuItem>
+                <Link href="/profile" className="flex w-full items-center cursor-pointer">
                   <User className="mr-2 h-4 w-4" />
                   Perfil
                 </Link>
