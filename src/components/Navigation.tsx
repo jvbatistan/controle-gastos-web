@@ -16,11 +16,13 @@ import {
   LogOut,
   Hammer,
   Wallet,
+  CircleDollarSign,
 } from "lucide-react";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: Home, enabled: true },
   { href: "/transactions", label: "Transações", icon: CreditCard, enabled: true },
+  { href: "/payments", label: "Pagamentos", icon: CircleDollarSign, enabled: true },
   { href: "/suggestions", label: "Sugestões", icon: Sparkles, enabled: true },
   { href: "/categories", label: "Categorias", icon: PieChart, enabled: true },
   { href: "/cards", label: "Cartões", icon: Wallet, enabled: true },
