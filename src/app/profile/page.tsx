@@ -62,7 +62,7 @@ export default function ProfilePage() {
       <div className="flex">
         <Navigation isMobileOpen={isMobileNavOpen} onClose={() => setIsMobileNavOpen(false)} />
 
-        <main className="flex-1 p-4 sm:p-6 lg:p-8">
+        <main className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8">
           <div className="mx-auto max-w-4xl space-y-6">
             <div>
               <h1 className="text-3xl font-bold text-neutral-900">Meu perfil</h1>

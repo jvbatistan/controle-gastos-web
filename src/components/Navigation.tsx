@@ -21,7 +21,7 @@ const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: Home, enabled: true },
   { href: "/transactions", label: "Transações", icon: CreditCard, enabled: true },
   { href: "/suggestions", label: "Sugestões", icon: Sparkles, enabled: true },
-  { href: "", label: "Categorias", icon: PieChart, enabled: false },
+  { href: "/categories", label: "Categorias", icon: PieChart, enabled: true },
   { href: "", label: "Investimentos", icon: TrendingUp, enabled: false },
   { href: "", label: "Planejamento", icon: Calendar, enabled: false },
   { href: "", label: "Configurações", icon: Settings, enabled: false },

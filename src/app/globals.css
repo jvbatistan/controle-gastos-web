@@ -1,2 +1,9 @@
 @import "tailwindcss";
 @import "../styles/index.css";
+
+html,
+body {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
