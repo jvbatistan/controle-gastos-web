@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { createTransaction } from "@/features/transactions/services/transactions.service";
-import { Transaction, TransactionPayload } from "@/features/transactions/types/transaction.types";
+import { CreateTransactionResponse, TransactionPayload } from "@/features/transactions/types/transaction.types";
 
 type UseCreateTransactionParams = {
   onUnauthorized: () => void;
@@ -12,7 +12,7 @@ export function useCreateTransaction({ onUnauthorized }: UseCreateTransactionPar
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function mutate(payload: TransactionPayload): Promise<Transaction | null> {
+  async function mutate(payload: TransactionPayload): Promise<CreateTransactionResponse | null> {
     try {
       setLoading(true);
       setError(null);

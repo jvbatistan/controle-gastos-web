@@ -1,48 +1,103 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectTriggerHTML } from "@/components/ui/select";
 import type { TransactionPayload } from "@/features/transactions/types/transaction.types";
 
-type CategoryOption = {
+type CardOption = {
   id: number;
   name: string;
 };
 
 type TransactionCreateFormProps = {
-  categories: CategoryOption[];
+  cards: CardOption[];
   loading?: boolean;
   onSubmit: (payload: TransactionPayload) => Promise<void> | void;
+  onCancel?: () => void;
 };
 
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return <label className="text-sm font-medium text-neutral-800">{children}</label>;
+}
+
+function formatCurrencyInput(value: string) {
+  const digits = value.replace(/\D/g, "");
+  const amount = Number(digits || "0") / 100;
+
+  return amount.toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function parseCurrencyInput(value: string) {
+  const normalized = value.replace(/\./g, "").replace(",", ".");
+  return Number(normalized);
+}
+
 export function TransactionCreateForm({
-  categories,
+  cards,
   loading = false,
   onSubmit,
+  onCancel,
 }: TransactionCreateFormProps) {
+  const [kind, setKind] = useState<"expense" | "income">("expense");
   const [description, setDescription] = useState("");
   const [value, setValue] = useState("");
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [categoryId, setCategoryId] = useState("all");
+  const [source, setSource] = useState<"cash" | "card" | "bank">("cash");
+  const [cardId, setCardId] = useState("none");
   const [paid, setPaid] = useState(false);
+  const [hasInstallments, setHasInstallments] = useState(false);
+  const [installmentNumber, setInstallmentNumber] = useState("1");
+  const [installmentsCount, setInstallmentsCount] = useState("2");
+  const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  const categoryOptions = useMemo(
-    () => [{ value: "all", label: "Sem categoria" }, ...categories.map((c) => ({ value: String(c.id), label: c.name }))],
-    [categories]
+  const sourceOptions = useMemo(
+    () => [
+      { value: "cash", label: "Dinheiro" },
+      { value: "bank", label: "Banco" },
+      { value: "card", label: "Cartão" },
+    ],
+    []
+  );
+
+  const cardOptions = useMemo(
+    () => [{ value: "none", label: "Selecione um cartão" }, ...cards.map((card) => ({ value: String(card.id), label: card.name }))],
+    [cards]
   );
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
     const normalizedDescription = description.trim();
-    const normalizedValue = Number(value);
+    const normalizedValue = parseCurrencyInput(value);
+    const normalizedInstallmentNumber = Number(installmentNumber);
+    const normalizedInstallmentsCount = Number(installmentsCount);
+    const requiresCard = source === "card";
 
     if (!normalizedDescription || !date || !(normalizedValue > 0)) {
       setError("Preencha descrição, valor e data corretamente.");
+      return;
+    }
+
+    if (requiresCard && cardId === "none") {
+      setError("Selecione um cartão para transações no cartão.");
+      return;
+    }
+
+    if (
+      hasInstallments &&
+      (!Number.isInteger(normalizedInstallmentNumber) ||
+        !Number.isInteger(normalizedInstallmentsCount) ||
+        normalizedInstallmentNumber < 1 ||
+        normalizedInstallmentsCount < 2 ||
+        normalizedInstallmentNumber > normalizedInstallmentsCount)
+    ) {
+      setError("Preencha os campos de parcelamento corretamente.");
       return;
     }
 
@@ -52,67 +107,218 @@ export function TransactionCreateForm({
       description: normalizedDescription,
       value: normalizedValue,
       date,
-      kind: "expense",
-      source: "cash",
+      kind,
+      source,
       paid,
-      category_id: categoryId === "all" ? null : Number(categoryId),
+      note: note.trim() || undefined,
+      card_id: source === "card" && cardId !== "none" ? Number(cardId) : null,
+      installment_number: hasInstallments ? normalizedInstallmentNumber : null,
+      installments_count: hasInstallments ? normalizedInstallmentsCount : null,
     });
 
+    setKind("expense");
     setDescription("");
     setValue("");
     setDate(new Date().toISOString().slice(0, 10));
-    setCategoryId("all");
+    setSource("cash");
+    setCardId("none");
     setPaid(false);
+    setHasInstallments(false);
+    setInstallmentNumber("1");
+    setInstallmentsCount("2");
+    setNote("");
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Nova Transação</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
-          <Input
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Descrição"
-            disabled={loading}
-          />
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <section className="space-y-4 rounded-2xl border border-neutral-200 bg-neutral-50/70 p-4 sm:p-5">
+        <div className="space-y-1">
+          <h3 className="text-base font-semibold text-neutral-900">Dados principais</h3>
+          <p className="text-sm text-neutral-500">Cadastre a transação e deixe a classificação automática fazer o resto.</p>
+        </div>
 
-          <Input
-            type="number"
-            min="0.01"
-            step="0.01"
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            placeholder="Valor"
-            disabled={loading}
-          />
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-2 md:col-span-2">
+            <FieldLabel>Tipo de transação</FieldLabel>
+            <div className="grid grid-cols-2 gap-2 rounded-xl bg-white p-1 shadow-sm ring-1 ring-neutral-200">
+              <button
+                type="button"
+                onClick={() => setKind("expense")}
+                className={[
+                  "rounded-lg px-4 py-2 text-sm font-medium transition",
+                  kind === "expense" ? "bg-rose-600 text-white shadow-sm" : "text-neutral-600 hover:bg-neutral-100",
+                ].join(" ")}
+              >
+                Despesa
+              </button>
+              <button
+                type="button"
+                onClick={() => setKind("income")}
+                className={[
+                  "rounded-lg px-4 py-2 text-sm font-medium transition",
+                  kind === "income" ? "bg-emerald-600 text-white shadow-sm" : "text-neutral-600 hover:bg-neutral-100",
+                ].join(" ")}
+                disabled={true}
+              >
+                Receita
+                <small> (Em construção)</small>
+              </button>
+            </div>
+          </div>
 
-          <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} disabled={loading} />
+          <div className="space-y-2 md:col-span-2">
+            <FieldLabel>Descrição</FieldLabel>
+            <Input
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Ex: Compra no supermercado"
+              disabled={loading}
+              className="h-11 rounded-xl bg-white"
+            />
+          </div>
 
-          <Select value={categoryId} onValueChange={setCategoryId}>
-            <SelectTriggerHTML placeholder="Categoria" options={categoryOptions} />
-          </Select>
+          <div className="space-y-2">
+            <FieldLabel>Valor (R$)</FieldLabel>
+            <Input
+              type="text"
+              inputMode="decimal"
+              value={value}
+              onChange={(e) => setValue(formatCurrencyInput(e.target.value))}
+              placeholder="0,00"
+              disabled={loading}
+              className="h-11 rounded-xl bg-white"
+            />
+          </div>
 
-          <label className="flex items-center gap-2 text-sm text-neutral-700">
+          <div className="space-y-2">
+            <FieldLabel>Data</FieldLabel>
+            <Input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              disabled={loading}
+              className="h-11 rounded-xl bg-white"
+            />
+          </div>
+        </div>
+      </section>
+
+      <section className="space-y-4 rounded-2xl border border-neutral-200 bg-white p-4 sm:p-5">
+        <div className="space-y-1">
+          <h3 className="text-base font-semibold text-neutral-900">Pagamento</h3>
+          <p className="text-sm text-neutral-500">Escolha a origem da transação e informe o cartão apenas quando fizer sentido.</p>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-2">
+            <FieldLabel>Origem</FieldLabel>
+            <Select value={source} onValueChange={(value) => setSource(value as "cash" | "card" | "bank")}>
+              <SelectTriggerHTML placeholder="Selecione a origem" options={sourceOptions} className="h-11 rounded-xl bg-white" />
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <FieldLabel>Cartão</FieldLabel>
+            <Select value={cardId} onValueChange={setCardId}>
+              <SelectTriggerHTML
+                placeholder="Selecione um cartão"
+                options={cardOptions}
+                className={["h-11 rounded-xl bg-white", source !== "card" ? "opacity-60" : ""].join(" ")}
+              />
+            </Select>
+          </div>
+
+          <label className="inline-flex items-center gap-3 rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-700">
             <input
               type="checkbox"
               checked={paid}
               onChange={(e) => setPaid(e.target.checked)}
               disabled={loading}
+              className="h-4 w-4 rounded border-neutral-300"
             />
-            Pago
+            Marcar como paga
           </label>
+        </div>
+      </section>
 
-          <div className="md:col-span-2 lg:col-span-5 flex items-center justify-between gap-3">
-            <span className="text-sm text-rose-700">{error ?? " "}</span>
-            <Button type="submit" disabled={loading}>
-              {loading ? "Salvando..." : "Salvar"}
-            </Button>
+      <section className="space-y-4 rounded-2xl border border-neutral-200 bg-white p-4 sm:p-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-1">
+            <h3 className="text-base font-semibold text-neutral-900">Parcelamento</h3>
+            <p className="text-sm text-neutral-500">Ative apenas quando a compra precisar gerar múltiplas parcelas.</p>
           </div>
-        </form>
-      </CardContent>
-    </Card>
+
+          <label className="inline-flex items-center gap-3 rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-700">
+            <input
+              type="checkbox"
+              checked={hasInstallments}
+              onChange={(e) => setHasInstallments(e.target.checked)}
+              disabled={loading}
+              className="h-4 w-4 rounded border-neutral-300"
+            />
+            Compra parcelada
+          </label>
+        </div>
+
+        {hasInstallments && (
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <FieldLabel>Parcela atual</FieldLabel>
+              <Input
+                type="number"
+                min="1"
+                step="1"
+                value={installmentNumber}
+                onChange={(e) => setInstallmentNumber(e.target.value)}
+                placeholder="1"
+                disabled={loading}
+                className="h-11 rounded-xl bg-white"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <FieldLabel>Total de parcelas</FieldLabel>
+              <Input
+                type="number"
+                min="2"
+                step="1"
+                value={installmentsCount}
+                onChange={(e) => setInstallmentsCount(e.target.value)}
+                placeholder="10"
+                disabled={loading}
+                className="h-11 rounded-xl bg-white"
+              />
+            </div>
+          </div>
+        )}
+      </section>
+
+      <section className="space-y-2">
+        <FieldLabel>Observações</FieldLabel>
+        <textarea
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="Adicione observações sobre esta transação..."
+          rows={4}
+          disabled={loading}
+          className="w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm text-neutral-800 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-400 disabled:cursor-not-allowed disabled:opacity-50"
+        />
+      </section>
+
+      <div className="flex flex-col gap-3 border-t border-neutral-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
+        <span className="min-h-5 text-sm text-rose-700">{error ?? ""}</span>
+
+        <div className="flex flex-col gap-2 sm:flex-row">
+          {onCancel && (
+            <Button type="button" variant="outline" onClick={onCancel} disabled={loading}>
+              Cancelar
+            </Button>
+          )}
+          <Button type="submit" disabled={loading} className="bg-blue-600 text-white hover:bg-blue-700">
+            {loading ? "Salvando..." : kind === "expense" ? "Salvar despesa" : "Salvar receita"}
+          </Button>
+        </div>
+      </div>
+    </form>
   );
 }

@@ -17,8 +17,20 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ArrowDownRight, ArrowUpRight, MoreVertical, Pencil, Trash2, Eye, Copy } from "lucide-react";
-import type { Transaction } from "@/features/transactions/types/transaction.types";
+import {
+  ArrowDownRight,
+  ArrowUpRight,
+  MoreVertical,
+  Pencil,
+  Trash2,
+  Eye,
+  Copy,
+  Sparkles,
+} from "lucide-react";
+import type {
+  Transaction,
+  TransactionClassificationStatus,
+} from "@/features/transactions/types/transaction.types";
 
 type TransactionTableProps = {
   items: Transaction[];
@@ -27,6 +39,17 @@ type TransactionTableProps = {
   onView?: (tx: Transaction) => void;
   onEdit?: (tx: Transaction) => void;
   onDelete?: (tx: Transaction) => void;
+  onReviewClassification?: (tx: Transaction) => void;
+};
+
+type BadgeTone = {
+  label: string;
+  className: string;
+  style: {
+    backgroundColor: string;
+    color: string;
+    borderColor?: string;
+  };
 };
 
 function formatDateBR(dateISO: string) {
@@ -37,22 +60,70 @@ function formatBRL(value: number) {
   return Number(value).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-const statusColors: Record<"paid" | "open", string> = {
-  paid: "bg-emerald-100 text-emerald-700",
-  open: "bg-amber-100 text-amber-700",
+const paymentStatusColors: Record<"paid" | "open", BadgeTone> = {
+  paid: {
+    label: "Pago",
+    className: "border-transparent",
+    style: { backgroundColor: "#d1fae5", color: "#047857" },
+  },
+  open: {
+    label: "Em aberto",
+    className: "border-transparent",
+    style: { backgroundColor: "#fef3c7", color: "#b45309" },
+  },
 };
+
+const classificationConfig: Record<TransactionClassificationStatus, BadgeTone> = {
+  classified: {
+    label: "Classificada",
+    className: "border-transparent",
+    style: { backgroundColor: "#dcfce7", color: "#166534" },
+  },
+  suggestion_pending: {
+    label: "Sugestão pendente",
+    className: "border-transparent",
+    style: { backgroundColor: "#e0f2fe", color: "#075985" },
+  },
+  unclassified: {
+    label: "Sem classificação",
+    className: "border",
+    style: { backgroundColor: "#f5f5f5", color: "#525252", borderColor: "#d4d4d4" },
+  },
+};
+
+function getClassificationStatus(transaction: Transaction): TransactionClassificationStatus {
+  return transaction.classification?.status ?? (transaction.category ? "classified" : "unclassified");
+}
+
+function getClassificationBadge(transaction: Transaction) {
+  return classificationConfig[getClassificationStatus(transaction)];
+}
+
+function canReviewClassification(transaction: Transaction) {
+  const status = getClassificationStatus(transaction);
+  return status === "suggestion_pending" || status === "unclassified";
+}
+
+function renderInstallmentLabel(transaction: Transaction) {
+  if (!transaction.installment_number || !transaction.installments_count) return null;
+  return `(${transaction.installment_number}/${transaction.installments_count})`;
+}
 
 function TransactionActions({
   transaction,
   onView,
   onEdit,
   onDelete,
+  onReviewClassification,
 }: {
   transaction: Transaction;
   onView?: (tx: Transaction) => void;
   onEdit?: (tx: Transaction) => void;
   onDelete?: (tx: Transaction) => void;
+  onReviewClassification?: (tx: Transaction) => void;
 }) {
+  const shouldShowReviewAction = canReviewClassification(transaction);
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -62,15 +133,21 @@ function TransactionActions({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuItem onClick={() => onView?.(transaction)}>
-          <Eye className="h-4 w-4 mr-2" />
+          <Eye className="mr-2 h-4 w-4" />
           Ver detalhes
         </DropdownMenuItem>
+        {shouldShowReviewAction && (
+          <DropdownMenuItem disabled={!onReviewClassification} onClick={() => onReviewClassification?.(transaction)}>
+            <Sparkles className="mr-2 h-4 w-4" />
+            Revisar classificação
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem disabled={!onEdit} onClick={() => onEdit?.(transaction)}>
-          <Pencil className="h-4 w-4 mr-2" />
+          <Pencil className="mr-2 h-4 w-4" />
           Editar
         </DropdownMenuItem>
         <DropdownMenuItem disabled>
-          <Copy className="h-4 w-4 mr-2" />
+          <Copy className="mr-2 h-4 w-4" />
           Duplicar (em breve)
         </DropdownMenuItem>
         <DropdownMenuItem
@@ -78,7 +155,7 @@ function TransactionActions({
           onClick={() => onDelete?.(transaction)}
           className="text-rose-600"
         >
-          <Trash2 className="h-4 w-4 mr-2" />
+          <Trash2 className="mr-2 h-4 w-4" />
           Excluir
         </DropdownMenuItem>
       </DropdownMenuContent>
@@ -93,6 +170,7 @@ export function TransactionTable({
   onView,
   onEdit,
   onDelete,
+  onReviewClassification,
 }: TransactionTableProps) {
   const emptyState = error ? (
     <div className="py-10 text-center text-rose-600">{error}</div>
@@ -118,7 +196,9 @@ export function TransactionTable({
           {!emptyState &&
             items.map((t) => {
               const isExpense = t.kind === "expense";
-              const statusKey = t.paid ? "paid" : "open";
+              const paymentStatus = paymentStatusColors[t.paid ? "paid" : "open"];
+              const classificationBadge = getClassificationBadge(t);
+              const installmentLabel = renderInstallmentLabel(t);
 
               return (
                 <div key={t.id} className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
@@ -136,16 +216,19 @@ export function TransactionTable({
 
                       <div className="min-w-0">
                         <p className="font-medium text-neutral-900">
-                          {t.description}{" "}
-                          {t.installment_number && t.installments_count
-                            ? `(${t.installment_number}/${t.installments_count})`
-                            : ""}
+                          {t.description} {installmentLabel}
                         </p>
                         <p className="mt-1 text-xs text-neutral-500">{formatDateBR(t.date)}</p>
                       </div>
                     </div>
 
-                    <TransactionActions transaction={t} onView={onView} onEdit={onEdit} onDelete={onDelete} />
+                    <TransactionActions
+                      transaction={t}
+                      onView={onView}
+                      onEdit={onEdit}
+                      onDelete={onDelete}
+                      onReviewClassification={onReviewClassification}
+                    />
                   </div>
 
                   {(t.note || t.card?.name) && (
@@ -164,8 +247,12 @@ export function TransactionTable({
                       <Badge variant="outline">Sem categoria</Badge>
                     )}
 
-                    <Badge variant="secondary" className={statusColors[statusKey]}>
-                      {t.paid ? "Pago" : "Em aberto"}
+                    <Badge variant="outline" className={classificationBadge.className} style={classificationBadge.style}>
+                      {classificationBadge.label}
+                    </Badge>
+
+                    <Badge variant="outline" className={paymentStatus.className} style={paymentStatus.style}>
+                      {paymentStatus.label}
                     </Badge>
                   </div>
 
@@ -187,6 +274,7 @@ export function TransactionTable({
                 <TableHead>Data</TableHead>
                 <TableHead>Descrição</TableHead>
                 <TableHead>Categoria</TableHead>
+                <TableHead>Classificação</TableHead>
                 <TableHead>Cartão</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Valor</TableHead>
@@ -197,7 +285,7 @@ export function TransactionTable({
             <TableBody>
               {error && (
                 <TableRow>
-                  <TableCell colSpan={7} className="py-10 text-center text-rose-600">
+                  <TableCell colSpan={8} className="py-10 text-center text-rose-600">
                     {error}
                   </TableCell>
                 </TableRow>
@@ -205,7 +293,7 @@ export function TransactionTable({
 
               {!error && !loading && items.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="py-10 text-center text-neutral-500">
+                  <TableCell colSpan={8} className="py-10 text-center text-neutral-500">
                     Nenhuma transação encontrada.
                   </TableCell>
                 </TableRow>
@@ -213,7 +301,9 @@ export function TransactionTable({
 
               {items.map((t) => {
                 const isExpense = t.kind === "expense";
-                const statusKey = t.paid ? "paid" : "open";
+                const paymentStatus = paymentStatusColors[t.paid ? "paid" : "open"];
+                const classificationBadge = getClassificationBadge(t);
+                const installmentLabel = renderInstallmentLabel(t);
 
                 return (
                   <TableRow key={t.id} className="hover:bg-neutral-50">
@@ -233,10 +323,7 @@ export function TransactionTable({
 
                         <div>
                           <div className="font-medium text-neutral-900">
-                            {t.description}{" "}
-                            {t.installment_number && t.installments_count
-                              ? `(${t.installment_number}/${t.installments_count})`
-                              : ""}
+                            {t.description} {installmentLabel}
                           </div>
                           <div className="mt-0.5 text-xs text-neutral-500">{t.note}</div>
                         </div>
@@ -253,11 +340,17 @@ export function TransactionTable({
                       )}
                     </TableCell>
 
+                    <TableCell>
+                      <Badge variant="outline" className={classificationBadge.className} style={classificationBadge.style}>
+                        {classificationBadge.label}
+                      </Badge>
+                    </TableCell>
+
                     <TableCell className="text-neutral-600">{t.card?.name ?? "—"}</TableCell>
 
                     <TableCell>
-                      <Badge variant="secondary" className={statusColors[statusKey]}>
-                        {t.paid ? "Pago" : "Em aberto"}
+                      <Badge variant="outline" className={paymentStatus.className} style={paymentStatus.style}>
+                        {paymentStatus.label}
                       </Badge>
                     </TableCell>
 
@@ -268,7 +361,13 @@ export function TransactionTable({
                     </TableCell>
 
                     <TableCell>
-                      <TransactionActions transaction={t} onView={onView} onEdit={onEdit} onDelete={onDelete} />
+                      <TransactionActions
+                        transaction={t}
+                        onView={onView}
+                        onEdit={onEdit}
+                        onDelete={onDelete}
+                        onReviewClassification={onReviewClassification}
+                      />
                     </TableCell>
                   </TableRow>
                 );

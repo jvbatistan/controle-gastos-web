@@ -1,4 +1,5 @@
 import {
+  CreateTransactionResponse,
   Transaction,
   TransactionFilters,
   TransactionPayload,
@@ -41,12 +42,23 @@ export async function createTransaction(payload: TransactionPayload) {
       method: "POST",
       body: JSON.stringify({ transaction: payload }),
       cache: "no-store",
-    })) as Transaction;
+    })) as Transaction | { installment_group_id: string; transactions: Transaction[] };
 
-    return { status: 201 as const, data };
+    const normalized: CreateTransactionResponse = "transactions" in data
+      ? {
+          kind: "installment_group",
+          installment_group_id: data.installment_group_id,
+          transactions: data.transactions,
+        }
+      : {
+          kind: "single",
+          transaction: data,
+        };
+
+    return { status: 201 as const, data: normalized };
   } catch (err) {
     if (err instanceof Error && err.message.includes("401")) {
-      return { status: 401 as const, data: null as Transaction | null };
+      return { status: 401 as const, data: null as CreateTransactionResponse | null };
     }
     throw err;
   }
