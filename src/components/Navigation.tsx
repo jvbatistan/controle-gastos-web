@@ -15,6 +15,7 @@ import {
   User,
   LogOut,
   Hammer,
+  Wallet,
 } from "lucide-react";
 
 const navItems = [
@@ -22,6 +23,7 @@ const navItems = [
   { href: "/transactions", label: "Transações", icon: CreditCard, enabled: true },
   { href: "/suggestions", label: "Sugestões", icon: Sparkles, enabled: true },
   { href: "/categories", label: "Categorias", icon: PieChart, enabled: true },
+  { href: "/cards", label: "Cartões", icon: Wallet, enabled: true },
   { href: "", label: "Investimentos", icon: TrendingUp, enabled: false },
   { href: "", label: "Planejamento", icon: Calendar, enabled: false },
   { href: "", label: "Configurações", icon: Settings, enabled: false },
