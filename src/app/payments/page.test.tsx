@@ -104,7 +104,7 @@ describe("PaymentsPage", () => {
     await user.click(screen.getAllByRole("button", { name: /Pagar despesa/i })[0]);
 
     await waitFor(() => {
-      expect(payLooseExpense).toHaveBeenCalledWith(1);
+      expect(payLooseExpense).toHaveBeenCalledWith(1, expect.any(Number), expect.any(Number));
       expect(refetch).toHaveBeenCalled();
       expect(screen.getByText('Despesa "MERCADO" marcada como paga.')).toBeInTheDocument();
     });
@@ -121,6 +121,29 @@ describe("PaymentsPage", () => {
       expect(payLooseExpenses).toHaveBeenCalledWith(expect.any(Number), expect.any(Number));
       expect(refetch).toHaveBeenCalled();
       expect(screen.getByText("2 despesas avulsas marcadas como pagas.")).toBeInTheDocument();
+    });
+  });
+
+  it("blocks loose-expense actions while a loose-expense request is in flight", async () => {
+    payLooseExpense.mockImplementation(() => new Promise(() => {}));
+    const user = userEvent.setup();
+    render(<PaymentsPage />);
+
+    await user.click(screen.getByRole("button", { name: /Avulsas/i }));
+    const batchButton = screen.getByRole("button", { name: /Pagar todas as despesas/i });
+    const itemButtons = screen.getAllByRole("button", { name: /Pagar despesa/i });
+
+    expect(batchButton).toBeEnabled();
+    expect(itemButtons[0]).toBeEnabled();
+    expect(itemButtons[1]).toBeEnabled();
+
+    await user.click(itemButtons[0]);
+
+    await waitFor(() => {
+      expect(payLooseExpense).toHaveBeenCalledWith(1, expect.any(Number), expect.any(Number));
+      expect(batchButton).toBeDisabled();
+      expect(itemButtons[0]).toBeDisabled();
+      expect(itemButtons[1]).toBeDisabled();
     });
   });
 });

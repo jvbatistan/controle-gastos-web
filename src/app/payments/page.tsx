@@ -103,6 +103,7 @@ export default function PaymentsPage() {
   );
 
   const totalLooseExpenses = Number(looseExpenses?.total_amount ?? 0);
+  const isSubmittingLooseExpenses = submittingKey === "loose-expenses" || submittingKey?.startsWith("loose-expense-") === true;
 
   async function handlePayStatement(statementId: number) {
     try {
@@ -126,7 +127,7 @@ export default function PaymentsPage() {
     try {
       setSubmittingKey(`loose-expense-${transactionId}`);
       setMessage(null);
-      const result = await payLooseExpense(transactionId);
+      const result = await payLooseExpense(transactionId, Number(month), Number(year));
       if (result.status === 401) {
         handleUnauthorized();
         return;
@@ -381,7 +382,7 @@ export default function PaymentsPage() {
                           <Button
                             variant="outline"
                             onClick={() => void handlePayLooseExpenses()}
-                            disabled={submittingKey === "loose-expenses"}
+                            disabled={isSubmittingLooseExpenses}
                             className="border-white/70 bg-white text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
                           >
                             {submittingKey === "loose-expenses" ? "Marcando tudo..." : "Pagar todas as despesas"}
@@ -419,7 +420,7 @@ export default function PaymentsPage() {
                               <Button
                                 size="sm"
                                 onClick={() => void handlePayLooseExpense(transaction.id, transaction.description)}
-                                disabled={isSubmitting}
+                                disabled={isSubmittingLooseExpenses}
                                 className="bg-emerald-600 text-white hover:bg-emerald-700"
                               >
                                 {isSubmitting ? "Registrando..." : "Pagar despesa"}
