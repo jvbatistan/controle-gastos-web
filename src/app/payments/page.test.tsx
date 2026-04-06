@@ -6,6 +6,7 @@ const push = vi.fn();
 const replace = vi.fn();
 const refetch = vi.fn();
 const payCardStatement = vi.fn();
+const ignoreCardStatement = vi.fn();
 const payLooseExpense = vi.fn();
 const payLooseExpenses = vi.fn();
 const usePayments = vi.fn();
@@ -30,6 +31,7 @@ vi.mock("@/components/Navigation", () => ({
 vi.mock("@/features/payments", () => ({
   usePayments: (...args: unknown[]) => usePayments(...args),
   payCardStatement: (...args: unknown[]) => payCardStatement(...args),
+  ignoreCardStatement: (...args: unknown[]) => ignoreCardStatement(...args),
   payLooseExpense: (...args: unknown[]) => payLooseExpense(...args),
   payLooseExpenses: (...args: unknown[]) => payLooseExpenses(...args),
 }));
@@ -39,6 +41,7 @@ beforeEach(() => {
   replace.mockReset();
   refetch.mockReset().mockResolvedValue(undefined);
   payCardStatement.mockReset().mockResolvedValue({ status: 200, data: { card: { name: "NUBANK" } } });
+  ignoreCardStatement.mockReset().mockResolvedValue({ status: 200, data: { id: 1, ignored_at: "2026-03-12T10:00:00Z" } });
   payLooseExpense.mockReset().mockResolvedValue({
     status: 200,
     data: { id: 1, description: "MERCADO", value: 80, date: "2026-03-10", source: "cash", paid: true },
@@ -94,6 +97,20 @@ describe("PaymentsPage", () => {
       expect(payCardStatement).toHaveBeenCalledWith(1);
       expect(refetch).toHaveBeenCalled();
       expect(screen.getByText('Fatura do cartão "NUBANK" quitada com sucesso.')).toBeInTheDocument();
+    });
+  });
+
+  it("allows ignoring a statement for the selected period", async () => {
+    const user = userEvent.setup();
+    render(<PaymentsPage />);
+
+    await user.click(screen.getByRole("button", { name: /Não pagar/i }));
+    await user.click(screen.getByRole("button", { name: /Confirmar não pagamento/i }));
+
+    await waitFor(() => {
+      expect(ignoreCardStatement).toHaveBeenCalledWith(1, expect.any(Number), expect.any(Number));
+      expect(refetch).toHaveBeenCalled();
+      expect(screen.getByText(/removida do fluxo de pagamento/i)).toBeInTheDocument();
     });
   });
 

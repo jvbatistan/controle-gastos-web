@@ -10,6 +10,7 @@ export type PaymentStatement = {
   remaining_amount: number;
   paid: boolean;
   paid_at?: string | null;
+  ignored_at?: string | null;
   due_day: number;
   closing_day: number;
   transactions_count: number;

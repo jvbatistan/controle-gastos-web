@@ -72,3 +72,20 @@ export async function payLooseExpense(transactionId: number, month: number, year
     throw err;
   }
 }
+
+export async function ignoreCardStatement(statementId: number, month: number, year: number) {
+  try {
+    const data = (await api(`/api/payments/card_statements/${statementId}/ignore`, {
+      method: "POST",
+      body: JSON.stringify({ month, year }),
+      cache: "no-store",
+    })) as PaymentStatement;
+
+    return { status: 200 as const, data };
+  } catch (err) {
+    if (err instanceof Error && err.message.includes("401")) {
+      return { status: 401 as const, data: null as PaymentStatement | null };
+    }
+    throw err;
+  }
+}

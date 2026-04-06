@@ -16,7 +16,7 @@ import { Navigation } from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectTriggerHTML } from "@/components/ui/select";
-import { payCardStatement, payLooseExpense, payLooseExpenses, usePayments } from "@/features/payments";
+import { ignoreCardStatement, payCardStatement, payLooseExpense, payLooseExpenses, usePayments } from "@/features/payments";
 import { useAuth } from "@/lib/useAuth";
 
 const monthOptions = [
@@ -58,6 +58,7 @@ function periodLabel(month: string, year: string) {
 
 type PaymentConfirmation =
   | { kind: "statement"; statementId: number; cardName: string; amount: number }
+  | { kind: "ignore-statement"; statementId: number; cardName: string; amount: number; period: string }
   | { kind: "loose-expense"; transactionId: number; description: string; amount: number }
   | { kind: "loose-expenses"; count: number; totalAmount: number; period: string };
 
@@ -130,6 +131,24 @@ export default function PaymentsPage() {
     }
   }
 
+  async function submitIgnoreStatement(statementId: number, cardName: string) {
+    try {
+      setSubmittingKey(`ignore-statement-${statementId}`);
+      setMessage(null);
+      const result = await ignoreCardStatement(statementId, Number(month), Number(year));
+      if (result.status === 401) {
+        handleUnauthorized();
+        return;
+      }
+      setMessage(`Fatura do cartão "${cardName}" removida do fluxo de pagamento de ${periodLabel(month, year)}.`);
+      await refetch();
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Não foi possível remover a fatura do fluxo de pagamento.");
+    } finally {
+      setSubmittingKey(null);
+    }
+  }
+
   async function submitPayLooseExpense(transactionId: number, description: string) {
     try {
       setSubmittingKey(`loose-expense-${transactionId}`);
@@ -174,6 +193,11 @@ export default function PaymentsPage() {
 
     if (current.kind === "statement") {
       await submitPayStatement(current.statementId);
+      return;
+    }
+
+    if (current.kind === "ignore-statement") {
+      await submitIgnoreStatement(current.statementId, current.cardName);
       return;
     }
 
@@ -305,6 +329,7 @@ export default function PaymentsPage() {
                   ) : (
                     statements.map((statement) => {
                       const isSubmitting = submittingKey === `statement-${statement.id}`;
+                      const isIgnoring = submittingKey === `ignore-statement-${statement.id}`;
                       const isPaid = statement.paid;
                       const gradient = statementGradient(statement.card.name);
 
@@ -369,18 +394,34 @@ export default function PaymentsPage() {
                                   Fatura quitada
                                 </Button>
                               ) : (
-                                <Button
-                                  onClick={() => setConfirmation({
-                                    kind: "statement",
-                                    statementId: statement.id,
-                                    cardName: statement.card.name,
-                                    amount: Number(statement.remaining_amount),
-                                  })}
-                                  disabled={isSubmitting}
-                                  className="w-full bg-neutral-900 text-white hover:bg-neutral-800 sm:w-auto"
-                                >
-                                  {isSubmitting ? "Registrando pagamento..." : "Pagar fatura"}
-                                </Button>
+                                <div className="flex w-full flex-col gap-2 sm:w-auto">
+                                  <Button
+                                    onClick={() => setConfirmation({
+                                      kind: "statement",
+                                      statementId: statement.id,
+                                      cardName: statement.card.name,
+                                      amount: Number(statement.remaining_amount),
+                                    })}
+                                    disabled={isSubmitting || isIgnoring}
+                                    className="w-full bg-neutral-900 text-white hover:bg-neutral-800 sm:w-auto"
+                                  >
+                                    {isSubmitting ? "Registrando pagamento..." : "Pagar fatura"}
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    onClick={() => setConfirmation({
+                                      kind: "ignore-statement",
+                                      statementId: statement.id,
+                                      cardName: statement.card.name,
+                                      amount: Number(statement.remaining_amount),
+                                      period: periodLabel(month, year),
+                                    })}
+                                    disabled={isSubmitting || isIgnoring}
+                                    className="w-full border-amber-300 text-amber-700 hover:bg-amber-50 hover:text-amber-800 sm:w-auto"
+                                  >
+                                    {isIgnoring ? "Atualizando..." : "Não pagar"}
+                                  </Button>
+                                </div>
                               )}
                             </div>
                           </div>
@@ -489,16 +530,20 @@ export default function PaymentsPage() {
                     <h2 className="text-xl font-semibold text-neutral-900">
                       {confirmation.kind === "statement"
                         ? "Confirmar pagamento da fatura"
-                        : confirmation.kind === "loose-expense"
-                          ? "Confirmar pagamento da despesa"
-                          : "Confirmar pagamento em lote"}
+                        : confirmation.kind === "ignore-statement"
+                          ? "Confirmar não pagamento da fatura"
+                          : confirmation.kind === "loose-expense"
+                            ? "Confirmar pagamento da despesa"
+                            : "Confirmar pagamento em lote"}
                     </h2>
                     <p className="mt-1 text-sm text-neutral-500">
                       {confirmation.kind === "statement"
                         ? `Você está prestes a quitar a fatura do cartão ${confirmation.cardName} no valor de ${formatBRL(confirmation.amount)}.`
-                        : confirmation.kind === "loose-expense"
-                          ? `Você está prestes a marcar a despesa ${confirmation.description} como paga no valor de ${formatBRL(confirmation.amount)}.`
-                          : `Você está prestes a quitar ${confirmation.count} despesa(s) avulsa(s) pendentes de ${confirmation.period}, totalizando ${formatBRL(confirmation.totalAmount)}.`}
+                        : confirmation.kind === "ignore-statement"
+                          ? `Você está prestes a retirar a fatura do cartão ${confirmation.cardName} do fluxo de pagamento de ${confirmation.period}. Ela deixará de compor os totais desse período sem ser marcada como paga.`
+                          : confirmation.kind === "loose-expense"
+                            ? `Você está prestes a marcar a despesa ${confirmation.description} como paga no valor de ${formatBRL(confirmation.amount)}.`
+                            : `Você está prestes a quitar ${confirmation.count} despesa(s) avulsa(s) pendentes de ${confirmation.period}, totalizando ${formatBRL(confirmation.totalAmount)}.`}
                     </p>
                   </div>
                   <Button type="button" variant="outline" size="sm" onClick={() => setConfirmation(null)} disabled={submittingKey !== null}>
@@ -519,9 +564,11 @@ export default function PaymentsPage() {
                   <Button type="button" onClick={() => void handleConfirmPayment()} disabled={submittingKey !== null} className="bg-neutral-900 text-white hover:bg-neutral-800">
                     {confirmation.kind === "statement"
                       ? "Confirmar pagamento da fatura"
-                      : confirmation.kind === "loose-expense"
-                        ? "Confirmar pagamento da despesa"
-                        : "Confirmar pagamento em lote"}
+                      : confirmation.kind === "ignore-statement"
+                        ? "Confirmar não pagamento"
+                        : confirmation.kind === "loose-expense"
+                          ? "Confirmar pagamento da despesa"
+                          : "Confirmar pagamento em lote"}
                   </Button>
                 </div>
               </div>
