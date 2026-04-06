@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CalendarDays, CreditCard, Landmark, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { CardBrandMark } from "@/components/CardBrandMark";
 import { Header } from "@/components/Header";
 import { Navigation } from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,7 @@ import { Card as SurfaceCard, CardContent, CardHeader, CardTitle } from "@/compo
 import { Input } from "@/components/ui/input";
 import { Select, SelectTriggerHTML } from "@/components/ui/select";
 import { createCard, deleteCard, updateCard, useCards, type Card } from "@/features/cards";
+import { getCardBrandPresentation } from "@/lib/cardBrand";
 import { useAuth } from "@/lib/useAuth";
 
 const dayOptions = Array.from({ length: 31 }, (_, index) => {
@@ -19,53 +21,9 @@ const dayOptions = Array.from({ length: 31 }, (_, index) => {
 
 const initialForm = { name: "", due_day: "15", closing_day: "8", limit: "" };
 
-const cardThemes = [
-  {
-    solid: "#2563eb",
-    panel: "bg-blue-100",
-    icon: "text-blue-600",
-    gradient: "from-blue-600 via-sky-500 to-cyan-400",
-  },
-  {
-    solid: "#7c3aed",
-    panel: "bg-violet-100",
-    icon: "text-violet-600",
-    gradient: "from-violet-600 via-fuchsia-500 to-purple-400",
-  },
-  {
-    solid: "#0f766e",
-    panel: "bg-teal-100",
-    icon: "text-teal-700",
-    gradient: "from-teal-700 via-emerald-600 to-green-400",
-  },
-  {
-    solid: "#ea580c",
-    panel: "bg-orange-100",
-    icon: "text-orange-600",
-    gradient: "from-orange-600 via-amber-500 to-yellow-400",
-  },
-  {
-    solid: "#db2777",
-    panel: "bg-pink-100",
-    icon: "text-pink-600",
-    gradient: "from-pink-600 via-rose-500 to-red-400",
-  },
-  {
-    solid: "#334155",
-    panel: "bg-slate-200",
-    icon: "text-slate-700",
-    gradient: "from-slate-700 via-slate-600 to-slate-400",
-  },
-];
-
 function formatLimit(limit: number | null) {
   if (limit == null) return "Sem limite informado";
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(limit);
-}
-
-function cardThemeFor(seed: string) {
-  const index = Array.from(seed).reduce((sum, char) => sum + char.charCodeAt(0), 0) % cardThemes.length;
-  return cardThemes[index];
 }
 
 export default function CardsPage() {
@@ -110,7 +68,10 @@ export default function CardsPage() {
     return Math.min(...sortedCards.map((card) => card.closing_day));
   }, [sortedCards]);
 
-  const previewTheme = cardThemeFor(form.name.trim() || "preview-card");
+  const previewBrand = useMemo(
+    () => getCardBrandPresentation(form.name.trim() || "preview card"),
+    [form.name]
+  );
 
   function resetForm() {
     setForm(initialForm);
@@ -295,18 +256,11 @@ export default function CardsPage() {
                   <>
                     <div className="space-y-3 md:hidden">
                       {sortedCards.map((card) => {
-                        const theme = cardThemeFor(`${card.id}-${card.name}`);
-
                         return (
                           <div key={card.id} className="rounded-2xl border border-neutral-200 p-4 transition hover:bg-neutral-50">
                             <div className="mb-3 flex items-start justify-between gap-3">
                               <div className="flex items-center gap-3">
-                                <div
-                                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl"
-                                  style={{ backgroundColor: theme.solid }}
-                                >
-                                  <CreditCard className="h-6 w-6 text-white" />
-                                </div>
+                                <CardBrandMark cardName={card.name} size="md" emphasize />
                                 <div>
                                   <div className="text-lg font-medium text-neutral-900">{card.name}</div>
                                   <div className="text-sm text-neutral-500">Fecha dia {card.closing_day} · Vence dia {card.due_day}</div>
@@ -350,19 +304,14 @@ export default function CardsPage() {
                         </thead>
                         <tbody>
                           {sortedCards.map((card) => {
-                            const theme = cardThemeFor(`${card.id}-${card.name}`);
-
                             return (
                               <tr key={card.id} className="border-b last:border-0 hover:bg-neutral-50">
                                 <td className="px-4 py-3">
                                   <div className="flex items-center gap-3">
-                                    <div
-                                      className="flex h-10 w-10 items-center justify-center rounded-xl"
-                                      style={{ backgroundColor: theme.solid }}
-                                    >
-                                      <CreditCard className="h-5 w-5 text-white" />
+                                    <CardBrandMark cardName={card.name} size="sm" />
+                                    <div className="min-w-0">
+                                      <span className="block truncate font-medium text-neutral-900">{card.name}</span>
                                     </div>
-                                    <span className="font-medium text-neutral-900">{card.name}</span>
                                   </div>
                                 </td>
                                 <td className="px-4 py-3 text-sm text-neutral-600">Fecha dia {card.closing_day} · Vence dia {card.due_day}</td>
@@ -470,13 +419,16 @@ export default function CardsPage() {
 
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-neutral-700">Preview</label>
-                    <div className={`rounded-3xl bg-gradient-to-br ${previewTheme.gradient} p-5 text-white shadow-lg`}>
+                    <div className={`rounded-3xl bg-gradient-to-br ${previewBrand.gradientClassName} p-5 text-white shadow-lg`}>
                       <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <div className="text-2xl font-bold">{form.name || "Nome do cartão"}</div>
+                        <div className="min-w-0">
+                          <div className="text-xs uppercase tracking-[0.22em] text-white/70">
+                            {previewBrand.logoSrc ? "Logo local identificada" : "Fallback elegante ativo"}
+                          </div>
+                          <div className="mt-2 text-2xl font-bold">{form.name || "Nome do cartão"}</div>
                           <div className="mt-1 text-sm text-white/85">Fecha dia {form.closing_day || "-"} · Vence dia {form.due_day || "-"}</div>
                         </div>
-                        <CreditCard className="h-8 w-8 text-white/90" />
+                        <CardBrandMark cardName={form.name || "preview card"} size="lg" emphasize />
                       </div>
 
                       <div className="mt-8 flex flex-wrap gap-3 text-sm">

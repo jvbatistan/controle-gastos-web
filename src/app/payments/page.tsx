@@ -11,12 +11,14 @@ import {
   X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { CardBrandMark } from "@/components/CardBrandMark";
 import { Header } from "@/components/Header";
 import { Navigation } from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectTriggerHTML } from "@/components/ui/select";
 import { ignoreCardStatement, payCardStatement, payLooseExpense, payLooseExpenses, usePayments } from "@/features/payments";
+import { getCardBrandPresentation } from "@/lib/cardBrand";
 import { useAuth } from "@/lib/useAuth";
 
 const monthOptions = [
@@ -62,17 +64,6 @@ type PaymentConfirmation =
   | { kind: "loose-expense"; transactionId: number; description: string; amount: number }
   | { kind: "loose-expenses"; count: number; totalAmount: number; period: string };
 
-function statementGradient(name: string) {
-  const gradients = [
-    "from-violet-600 to-fuchsia-500",
-    "from-blue-600 to-cyan-500",
-    "from-emerald-600 to-teal-500",
-    "from-orange-600 to-amber-500",
-  ];
-  const index = Array.from(name).reduce((sum, char) => sum + char.charCodeAt(0), 0) % gradients.length;
-  return gradients[index];
-}
-
 export default function PaymentsPage() {
   const router = useRouter();
   const auth = useAuth();
@@ -97,7 +88,10 @@ export default function PaymentsPage() {
     onUnauthorized: handleUnauthorized,
   });
 
-  const statements = useMemo(() => overview?.statements ?? [], [overview]);
+  const statements = useMemo(
+    () => (overview?.statements ?? []).filter((statement) => Number(statement.total_amount) > 0),
+    [overview]
+  );
   const looseExpenses = overview?.loose_expenses;
 
   const outstandingStatements = useMemo(
@@ -331,7 +325,11 @@ export default function PaymentsPage() {
                       const isSubmitting = submittingKey === `statement-${statement.id}`;
                       const isIgnoring = submittingKey === `ignore-statement-${statement.id}`;
                       const isPaid = statement.paid;
-                      const gradient = statementGradient(statement.card.name);
+                      const brand = getCardBrandPresentation(statement.card.name);
+                      const balanceBackground = {
+                        backgroundColor: brand.solidColor,
+                        backgroundImage: `linear-gradient(135deg, ${brand.solidColor} 0%, rgba(15, 23, 42, 0.16) 100%)`,
+                      };
 
                       return (
                         <div
@@ -340,9 +338,7 @@ export default function PaymentsPage() {
                         >
                           <div className="mb-4 flex items-start justify-between gap-4">
                             <div className="flex items-center gap-3">
-                              <div className={`flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${gradient}`}>
-                                <CreditCard className="h-6 w-6 text-white" />
-                              </div>
+                              <CardBrandMark cardName={statement.card.name} size="md" emphasize />
                               <div>
                                 <div className="text-lg font-bold text-neutral-900">{statement.card.name}</div>
                                 <div className="text-sm text-neutral-500">
@@ -379,7 +375,10 @@ export default function PaymentsPage() {
                             </div>
 
                             <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
-                              <div className={`min-w-[220px] rounded-2xl bg-gradient-to-br ${gradient} p-4 text-white`}>
+                              <div
+                                className="min-w-[220px] rounded-2xl p-4 text-white shadow-lg shadow-neutral-200/70"
+                                style={balanceBackground}
+                              >
                                 <div className="mb-1 text-xs opacity-90">Saldo da fatura</div>
                                 <div className="text-2xl font-bold">{formatBRL(statement.remaining_amount)}</div>
                                 <div className="mt-2 flex flex-wrap items-center gap-2 text-xs opacity-90">
