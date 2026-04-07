@@ -46,8 +46,19 @@ describe("TransactionTable", () => {
 
     const triggers = screen.getAllByRole("button");
     await user.click(triggers[0]);
-    await user.click(screen.getByRole("button", { name: /Revisar classificação/i }));
+    await user.click(screen.getByRole("menuitem", { name: /Revisar classificação/i }));
 
     expect(onReviewClassification).toHaveBeenCalledWith(baseTransaction);
+  });
+
+  it("shows the archive action when deletion is available", async () => {
+    const user = userEvent.setup();
+    const onDelete = vi.fn();
+
+    render(<TransactionTable items={[baseTransaction]} loading={false} onDelete={onDelete} />);
+
+    await user.click(screen.getAllByRole("button")[0]);
+
+    expect(screen.getByRole("menuitem", { name: /Arquivar/i })).toBeInTheDocument();
   });
 });

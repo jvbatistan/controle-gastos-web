@@ -24,7 +24,7 @@ export function useDeleteTransaction({ onUnauthorized }: UseDeleteTransactionPar
 
       return true;
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Erro ao excluir transação.";
+      const message = err instanceof Error ? err.message : "Erro ao arquivar transação.";
       setError(message);
       return false;
     } finally {

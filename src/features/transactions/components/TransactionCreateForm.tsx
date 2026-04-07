@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectTriggerHTML } from "@/components/ui/select";
-import type { TransactionPayload } from "@/features/transactions/types/transaction.types";
+import type { Transaction, TransactionPayload } from "@/features/transactions/types/transaction.types";
 
 type CardOption = {
   id: number;
@@ -13,6 +13,8 @@ type CardOption = {
 
 type TransactionCreateFormProps = {
   cards: CardOption[];
+  mode?: "create" | "edit";
+  initialTransaction?: Transaction | null;
   loading?: boolean;
   onSubmit: (payload: TransactionPayload) => Promise<void> | void;
   onCancel?: () => void;
@@ -37,24 +39,53 @@ function parseCurrencyInput(value: string) {
   return Number(normalized);
 }
 
+function toCurrencyInput(value?: number | null) {
+  if (value == null || Number.isNaN(Number(value))) return "";
+
+  return Number(value).toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function buildFormState(initialTransaction?: Transaction | null) {
+  return {
+    kind: initialTransaction?.kind ?? ("expense" as const),
+    description: initialTransaction?.description ?? "",
+    value: toCurrencyInput(initialTransaction?.value),
+    date: initialTransaction?.date ?? new Date().toISOString().slice(0, 10),
+    source: initialTransaction?.source ?? ("cash" as const),
+    cardId: initialTransaction?.card?.id ? String(initialTransaction.card.id) : "none",
+    paid: initialTransaction?.paid ?? false,
+    note: initialTransaction?.note ?? "",
+    hasInstallments: Boolean(initialTransaction?.installment_group_id),
+    installmentNumber: String(initialTransaction?.installment_number ?? 1),
+    installmentsCount: String(initialTransaction?.installments_count ?? 2),
+  };
+}
+
 export function TransactionCreateForm({
   cards,
+  mode = "create",
+  initialTransaction = null,
   loading = false,
   onSubmit,
   onCancel,
 }: TransactionCreateFormProps) {
-  const [kind, setKind] = useState<"expense" | "income">("expense");
-  const [description, setDescription] = useState("");
-  const [value, setValue] = useState("");
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [source, setSource] = useState<"cash" | "card" | "bank">("cash");
-  const [cardId, setCardId] = useState("none");
-  const [paid, setPaid] = useState(false);
-  const [hasInstallments, setHasInstallments] = useState(false);
-  const [installmentNumber, setInstallmentNumber] = useState("1");
-  const [installmentsCount, setInstallmentsCount] = useState("2");
-  const [note, setNote] = useState("");
+  const [kind, setKind] = useState<"expense" | "income">(buildFormState(initialTransaction).kind);
+  const [description, setDescription] = useState(buildFormState(initialTransaction).description);
+  const [value, setValue] = useState(buildFormState(initialTransaction).value);
+  const [date, setDate] = useState(buildFormState(initialTransaction).date);
+  const [source, setSource] = useState<"cash" | "card" | "bank">(buildFormState(initialTransaction).source);
+  const [cardId, setCardId] = useState(buildFormState(initialTransaction).cardId);
+  const [paid, setPaid] = useState(buildFormState(initialTransaction).paid);
+  const [hasInstallments, setHasInstallments] = useState(buildFormState(initialTransaction).hasInstallments);
+  const [installmentNumber, setInstallmentNumber] = useState(buildFormState(initialTransaction).installmentNumber);
+  const [installmentsCount, setInstallmentsCount] = useState(buildFormState(initialTransaction).installmentsCount);
+  const [note, setNote] = useState(buildFormState(initialTransaction).note);
   const [error, setError] = useState<string | null>(null);
+  const isEditing = mode === "edit";
+  const isInstallmentTransaction = Boolean(initialTransaction?.installment_group_id);
 
   const sourceOptions = useMemo(
     () => [
@@ -69,6 +100,22 @@ export function TransactionCreateForm({
     () => [{ value: "none", label: "Selecione um cartão" }, ...cards.map((card) => ({ value: String(card.id), label: card.name }))],
     [cards]
   );
+
+  useEffect(() => {
+    const nextState = buildFormState(initialTransaction);
+    setKind(nextState.kind);
+    setDescription(nextState.description);
+    setValue(nextState.value);
+    setDate(nextState.date);
+    setSource(nextState.source);
+    setCardId(nextState.cardId);
+    setPaid(nextState.paid);
+    setHasInstallments(nextState.hasInstallments);
+    setInstallmentNumber(nextState.installmentNumber);
+    setInstallmentsCount(nextState.installmentsCount);
+    setNote(nextState.note);
+    setError(null);
+  }, [initialTransaction, mode]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -112,21 +159,24 @@ export function TransactionCreateForm({
       paid,
       note: note.trim() || undefined,
       card_id: source === "card" && cardId !== "none" ? Number(cardId) : null,
-      installment_number: hasInstallments ? normalizedInstallmentNumber : null,
-      installments_count: hasInstallments ? normalizedInstallmentsCount : null,
+      installment_number: !isEditing && hasInstallments ? normalizedInstallmentNumber : null,
+      installments_count: !isEditing && hasInstallments ? normalizedInstallmentsCount : null,
     });
 
-    setKind("expense");
-    setDescription("");
-    setValue("");
-    setDate(new Date().toISOString().slice(0, 10));
-    setSource("cash");
-    setCardId("none");
-    setPaid(false);
-    setHasInstallments(false);
-    setInstallmentNumber("1");
-    setInstallmentsCount("2");
-    setNote("");
+    if (!isEditing) {
+      const nextState = buildFormState(null);
+      setKind(nextState.kind);
+      setDescription(nextState.description);
+      setValue(nextState.value);
+      setDate(nextState.date);
+      setSource(nextState.source);
+      setCardId(nextState.cardId);
+      setPaid(nextState.paid);
+      setHasInstallments(nextState.hasInstallments);
+      setInstallmentNumber(nextState.installmentNumber);
+      setInstallmentsCount(nextState.installmentsCount);
+      setNote(nextState.note);
+    }
   }
 
   return (
@@ -241,57 +291,66 @@ export function TransactionCreateForm({
         </div>
       </section>
 
-      <section className="space-y-4 rounded-2xl border border-neutral-200 bg-white p-4 sm:p-5">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="space-y-1">
-            <h3 className="text-base font-semibold text-neutral-900">Parcelamento</h3>
-            <p className="text-sm text-neutral-500">Ative apenas quando a compra precisar gerar múltiplas parcelas.</p>
-          </div>
-
-          <label className="inline-flex items-center gap-3 rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-700">
-            <input
-              type="checkbox"
-              checked={hasInstallments}
-              onChange={(e) => setHasInstallments(e.target.checked)}
-              disabled={loading}
-              className="h-4 w-4 rounded border-neutral-300"
-            />
-            Compra parcelada
-          </label>
-        </div>
-
-        {hasInstallments && (
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <FieldLabel>Parcela atual</FieldLabel>
-              <Input
-                type="number"
-                min="1"
-                step="1"
-                value={installmentNumber}
-                onChange={(e) => setInstallmentNumber(e.target.value)}
-                placeholder="1"
-                disabled={loading}
-                className="h-11 rounded-xl bg-white"
-              />
+      {!isEditing ? (
+        <section className="space-y-4 rounded-2xl border border-neutral-200 bg-white p-4 sm:p-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-1">
+              <h3 className="text-base font-semibold text-neutral-900">Parcelamento</h3>
+              <p className="text-sm text-neutral-500">Ative apenas quando a compra precisar gerar múltiplas parcelas.</p>
             </div>
 
-            <div className="space-y-2">
-              <FieldLabel>Total de parcelas</FieldLabel>
-              <Input
-                type="number"
-                min="2"
-                step="1"
-                value={installmentsCount}
-                onChange={(e) => setInstallmentsCount(e.target.value)}
-                placeholder="10"
+            <label className="inline-flex items-center gap-3 rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-700">
+              <input
+                type="checkbox"
+                checked={hasInstallments}
+                onChange={(e) => setHasInstallments(e.target.checked)}
                 disabled={loading}
-                className="h-11 rounded-xl bg-white"
+                className="h-4 w-4 rounded border-neutral-300"
               />
-            </div>
+              Compra parcelada
+            </label>
           </div>
-        )}
-      </section>
+
+          {hasInstallments && (
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <FieldLabel>Parcela atual</FieldLabel>
+                <Input
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={installmentNumber}
+                  onChange={(e) => setInstallmentNumber(e.target.value)}
+                  placeholder="1"
+                  disabled={loading}
+                  className="h-11 rounded-xl bg-white"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <FieldLabel>Total de parcelas</FieldLabel>
+                <Input
+                  type="number"
+                  min="2"
+                  step="1"
+                  value={installmentsCount}
+                  onChange={(e) => setInstallmentsCount(e.target.value)}
+                  placeholder="10"
+                  disabled={loading}
+                  className="h-11 rounded-xl bg-white"
+                />
+              </div>
+            </div>
+          )}
+        </section>
+      ) : isInstallmentTransaction ? (
+        <section className="space-y-2 rounded-2xl border border-amber-200 bg-amber-50/80 p-4 sm:p-5">
+          <h3 className="text-base font-semibold text-amber-900">Parcela vinculada a um grupo</h3>
+          <p className="text-sm text-amber-800">
+            Esta edição afeta apenas a parcela selecionada. O restante do grupo parcelado permanece como está.
+          </p>
+        </section>
+      ) : null}
 
       <section className="space-y-2">
         <FieldLabel>Observações</FieldLabel>
@@ -315,7 +374,7 @@ export function TransactionCreateForm({
             </Button>
           )}
           <Button type="submit" disabled={loading} className="bg-blue-600 text-white hover:bg-blue-700">
-            {loading ? "Salvando..." : kind === "expense" ? "Salvar despesa" : "Salvar receita"}
+            {loading ? "Salvando..." : isEditing ? "Salvar alterações" : kind === "expense" ? "Salvar despesa" : "Salvar receita"}
           </Button>
         </div>
       </div>

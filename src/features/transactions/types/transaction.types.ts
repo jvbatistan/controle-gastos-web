@@ -33,6 +33,7 @@ export type Transaction = {
   installment_number?: number | null;
   installments_count?: number | null;
   classification?: TransactionClassification | null;
+  archived_at?: string | null;
 };
 
 export type TransactionFilters = {

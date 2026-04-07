@@ -1,11 +1,15 @@
 "use client";
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 
 type DropdownContextValue = {
   open: boolean;
   setOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  rootRef: React.RefObject<HTMLDivElement | null>;
+  triggerRef: React.RefObject<HTMLElement | null>;
+  contentRef: React.RefObject<HTMLDivElement | null>;
 };
 
 const DropdownMenuContext = React.createContext<DropdownContextValue | null>(null);
@@ -23,10 +27,16 @@ function useDropdownMenu() {
 export function DropdownMenu({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = React.useState(false);
   const rootRef = React.useRef<HTMLDivElement | null>(null);
+  const triggerRef = React.useRef<HTMLElement | null>(null);
+  const contentRef = React.useRef<HTMLDivElement | null>(null);
 
   React.useEffect(() => {
     function handlePointerDown(event: MouseEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) {
+      const target = event.target as Node;
+      const clickedInsideRoot = rootRef.current?.contains(target);
+      const clickedInsideContent = contentRef.current?.contains(target);
+
+      if (!clickedInsideRoot && !clickedInsideContent) {
         setOpen(false);
       }
     }
@@ -45,7 +55,7 @@ export function DropdownMenu({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <DropdownMenuContext.Provider value={{ open, setOpen }}>
+    <DropdownMenuContext.Provider value={{ open, setOpen, rootRef, triggerRef, contentRef }}>
       <div ref={rootRef} className="relative inline-block text-left">
         {children}
       </div>
@@ -54,13 +64,22 @@ export function DropdownMenu({ children }: { children: React.ReactNode }) {
 }
 
 export function DropdownMenuTrigger({ asChild, children }: { asChild?: boolean; children: React.ReactNode }) {
-  const { open, setOpen } = useDropdownMenu();
+  const { open, setOpen, triggerRef } = useDropdownMenu();
 
   if (asChild && React.isValidElement(children)) {
     const child = children as React.ReactElement<Record<string, unknown>>;
     const childProps = child.props as { onClick?: React.MouseEventHandler };
+    const existingRef = child.props.ref;
 
     return React.cloneElement(child, {
+      ref: (node: HTMLElement | null) => {
+        triggerRef.current = node;
+
+        if (typeof existingRef === "function") existingRef(node);
+        else if (existingRef && typeof existingRef === "object") {
+          (existingRef as React.MutableRefObject<HTMLElement | null>).current = node;
+        }
+      },
       onClick: (event: React.MouseEvent) => {
         childProps.onClick?.(event);
         setOpen((value) => !value);
@@ -70,7 +89,14 @@ export function DropdownMenuTrigger({ asChild, children }: { asChild?: boolean; 
   }
 
   return (
-    <button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open}>
+    <button
+      type="button"
+      ref={(node) => {
+        triggerRef.current = node;
+      }}
+      onClick={() => setOpen((value) => !value)}
+      aria-expanded={open}
+    >
       {children}
     </button>
   );
@@ -85,22 +111,82 @@ export function DropdownMenuContent({
   align?: "start" | "end";
   children: React.ReactNode;
 }) {
-  const { open } = useDropdownMenu();
+  const { open, triggerRef, contentRef } = useDropdownMenu();
+  const [mounted, setMounted] = React.useState(false);
+  const [position, setPosition] = React.useState<{ top: number; left: number; transformOrigin: string }>({
+    top: 0,
+    left: 0,
+    transformOrigin: "top right",
+  });
 
-  if (!open) return null;
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
-  return (
+  React.useLayoutEffect(() => {
+    if (!open || !mounted) return;
+
+    function updatePosition() {
+      const trigger = triggerRef.current;
+      const content = contentRef.current;
+      if (!trigger || !content) return;
+
+      const triggerRect = trigger.getBoundingClientRect();
+      const contentRect = content.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const offset = 8;
+      const safeMargin = 8;
+
+      const spaceBelow = viewportHeight - triggerRect.bottom;
+      const shouldOpenUp = spaceBelow < contentRect.height + offset && triggerRect.top > contentRect.height + offset;
+
+      const top = shouldOpenUp
+        ? Math.max(safeMargin, triggerRect.top - contentRect.height - offset)
+        : Math.min(viewportHeight - contentRect.height - safeMargin, triggerRect.bottom + offset);
+
+      let left = align === "end" ? triggerRect.right - contentRect.width : triggerRect.left;
+      left = Math.min(Math.max(safeMargin, left), viewportWidth - contentRect.width - safeMargin);
+
+      setPosition({
+        top,
+        left,
+        transformOrigin: `${shouldOpenUp ? "bottom" : "top"} ${align === "end" ? "right" : "left"}`,
+      });
+    }
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [align, mounted, open, triggerRef]);
+
+  if (!open || !mounted) return null;
+
+  const content = (
     <div
+      ref={contentRef}
       className={cn(
-        "absolute z-50 mt-2 min-w-48 rounded-xl border border-neutral-200 bg-white p-1 shadow-lg",
-        align === "end" ? "right-0" : "left-0",
+        "fixed z-[80] min-w-48 rounded-xl border border-neutral-200 bg-white p-1 shadow-lg shadow-neutral-900/10",
         className
       )}
+      style={{
+        top: position.top,
+        left: position.left,
+        transformOrigin: position.transformOrigin,
+      }}
       data-align={align}
+      role="menu"
     >
       {children}
     </div>
   );
+
+  return createPortal(content, document.body);
 }
 
 export function DropdownMenuItem({
@@ -125,6 +211,7 @@ export function DropdownMenuItem({
         setOpen(false);
       }}
       disabled={disabled}
+      role="menuitem"
       className={cn(
         "flex w-full items-center rounded-lg px-3 py-2 text-left text-sm text-neutral-700 transition hover:bg-neutral-50",
         disabled && "cursor-not-allowed opacity-50",

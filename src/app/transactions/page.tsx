@@ -15,6 +15,7 @@ import {
   type Transaction,
   type TransactionPayload,
   useCreateTransaction,
+  useUpdateTransaction,
   useTransactions,
   useDeleteTransaction,
   defaultTransactionFilters,
@@ -27,13 +28,17 @@ export default function TransactionsPage() {
   const auth = useAuth();
 
   const [filters, setFilters] = useState<Filters>(defaultTransactionFilters);
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [classificationNotice, setClassificationNotice] = useState<string | null>(null);
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
 
   const clearFilters = () => setFilters(defaultTransactionFilters);
   const handleUnauthorized = useCallback(() => router.replace("/login"), [router]);
   const { createTransaction, loading: creating, error: createError } = useCreateTransaction({
+    onUnauthorized: handleUnauthorized,
+  });
+  const { updateTransaction, loading: updating, error: updateError } = useUpdateTransaction({
     onUnauthorized: handleUnauthorized,
   });
   const { deleteTransaction, loading: deleting, error: deleteError } = useDeleteTransaction({
@@ -43,7 +48,8 @@ export default function TransactionsPage() {
     console.info("view transaction", tx.id);
   }, []);
   const handleEditTransaction = useCallback((tx: Transaction) => {
-    console.info("edit transaction", tx.id);
+    setEditingTransaction(tx);
+    setIsTransactionModalOpen(true);
   }, []);
   const handleReviewClassification = useCallback((tx: Transaction) => {
     const suggestionId = tx.classification?.suggestion?.id;
@@ -81,14 +87,31 @@ export default function TransactionsPage() {
         }
 
         refetch();
-        setIsCreateModalOpen(false);
+        setEditingTransaction(null);
+        setIsTransactionModalOpen(false);
       }
     },
     [createTransaction, refetch]
   );
+  const handleUpdateTransaction = useCallback(
+    async (payload: TransactionPayload) => {
+      if (!editingTransaction) return;
+
+      const updated = await updateTransaction(editingTransaction.id, payload);
+      if (updated) {
+        setClassificationNotice(null);
+        setEditingTransaction(null);
+        refetch();
+        setIsTransactionModalOpen(false);
+      }
+    },
+    [editingTransaction, refetch, updateTransaction]
+  );
   const handleDeleteTransaction = useCallback(
     async (tx: Transaction) => {
-      const confirmed = window.confirm(`Excluir a transação "${tx.description}"?`);
+      const confirmed = window.confirm(
+        `Arquivar a transação "${tx.description}"? Ela deixará de aparecer nas listagens e cálculos ativos.`
+      );
       if (!confirmed) return;
 
       const ok = await deleteTransaction(tx.id);
@@ -120,7 +143,10 @@ export default function TransactionsPage() {
     <div className="min-h-screen bg-neutral-50">
       <Header
         onMenuClick={() => setIsMobileNavOpen(true)}
-        onNewTransactionClick={() => setIsCreateModalOpen(true)}
+        onNewTransactionClick={() => {
+          setEditingTransaction(null);
+          setIsTransactionModalOpen(true);
+        }}
       />
 
       <div className="flex">
@@ -174,22 +200,36 @@ export default function TransactionsPage() {
               onDelete={handleDeleteTransaction}
               onReviewClassification={handleReviewClassification}
             />
-            {deleting && <p className="text-xs text-neutral-500">Excluindo transação...</p>}
+            {deleting && <p className="text-xs text-neutral-500">Arquivando transação...</p>}
           </div>
         </main>
       </div>
 
-      {isCreateModalOpen && (
+      {isTransactionModalOpen && (
         <div className="fixed inset-0 z-[60] overflow-y-auto bg-black/40 px-4 py-4 sm:py-4">
           <div className="mx-auto flex min-h-full w-full max-w-3xl items-center justify-center">
             <div className="w-full overflow-hidden rounded-3xl bg-white shadow-2xl">
             <div className="border-b border-neutral-200 px-5 py-4 sm:px-6">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <h2 className="text-xl font-semibold text-neutral-900">Nova Transação</h2>
-                  <p className="mt-1 text-sm text-neutral-500">Adicione uma nova receita ou despesa e deixe a classificação automática sugerir a categoria.</p>
+                  <h2 className="text-xl font-semibold text-neutral-900">
+                    {editingTransaction ? "Editar Transação" : "Nova Transação"}
+                  </h2>
+                  <p className="mt-1 text-sm text-neutral-500">
+                    {editingTransaction
+                      ? "Ajuste a transação selecionada sem reescrever automaticamente o restante do grupo parcelado."
+                      : "Adicione uma nova receita ou despesa e deixe a classificação automática sugerir a categoria."}
+                  </p>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => setIsCreateModalOpen(false)} disabled={creating}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setEditingTransaction(null);
+                    setIsTransactionModalOpen(false);
+                  }}
+                  disabled={creating || updating}
+                >
                   Fechar
                 </Button>
               </div>
@@ -198,14 +238,19 @@ export default function TransactionsPage() {
             <div className="max-h-[calc(100vh-12rem)] overflow-y-auto px-5 py-5 sm:px-6">
               <TransactionCreateForm
                 cards={cards}
-                loading={creating}
-                onSubmit={handleCreateTransaction}
-                onCancel={() => setIsCreateModalOpen(false)}
+                mode={editingTransaction ? "edit" : "create"}
+                initialTransaction={editingTransaction}
+                loading={creating || updating}
+                onSubmit={editingTransaction ? handleUpdateTransaction : handleCreateTransaction}
+                onCancel={() => {
+                  setEditingTransaction(null);
+                  setIsTransactionModalOpen(false);
+                }}
               />
 
-              {createError && (
+              {(createError || updateError) && (
                 <p className="mt-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-                  {createError}
+                  {createError || updateError}
                 </p>
               )}
             </div>
