@@ -21,6 +21,9 @@ export type LooseExpenseTransaction = {
   description: string;
   value: number;
   date: string;
+  note?: string | null;
+  installment_number?: number | null;
+  installments_count?: number | null;
   source: "card" | "cash" | "bank";
   category_id?: number | null;
   paid: boolean;

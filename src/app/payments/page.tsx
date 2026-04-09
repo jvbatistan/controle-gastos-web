@@ -58,6 +58,14 @@ function periodLabel(month: string, year: string) {
   return `${monthLabel}/${year}`;
 }
 
+function renderInstallmentLabel(transaction: {
+  installment_number?: number | null;
+  installments_count?: number | null;
+}) {
+  if (!transaction.installment_number || !transaction.installments_count) return null;
+  return `(${transaction.installment_number}/${transaction.installments_count})`;
+}
+
 type PaymentConfirmation =
   | { kind: "statement"; statementId: number; cardName: string; amount: number }
   | { kind: "ignore-statement"; statementId: number; cardName: string; amount: number; period: string }
@@ -478,9 +486,10 @@ export default function PaymentsPage() {
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      <div className="mb-2 text-sm font-medium text-neutral-500">Descrição / Data</div>
+                      <div className="mb-2 text-sm font-medium text-neutral-500">Descrição / Valor</div>
                       {looseExpenses.transactions.map((transaction) => {
                         const isSubmitting = submittingKey === `loose-expense-${transaction.id}`;
+                        const installmentLabel = renderInstallmentLabel(transaction);
 
                         return (
                           <div
@@ -488,11 +497,18 @@ export default function PaymentsPage() {
                             className="flex flex-col gap-3 rounded-xl border border-neutral-200 p-4 hover:bg-neutral-50 sm:flex-row sm:items-center sm:justify-between"
                           >
                             <div className="flex-1">
-                              <div className="font-medium text-neutral-900">{transaction.description}</div>
-                              <div className="mt-1 text-sm text-neutral-500">{formatDateBR(transaction.date)}</div>
+                              <div className="font-medium text-neutral-900">
+                                {transaction.description} {installmentLabel}
+                              </div>
+                              {transaction.note && (
+                                <div className="mt-1 text-xs text-neutral-500">{transaction.note}</div>
+                              )}
                             </div>
                             <div className="flex items-center justify-between gap-4 sm:justify-end">
-                              <div className="text-lg font-bold text-neutral-900">{formatBRL(transaction.value)}</div>
+                              <div className="text-right">
+                                <div className="text-lg font-bold text-neutral-900">{formatBRL(transaction.value)}</div>
+                                <div className="mt-1 text-sm text-neutral-500">{formatDateBR(transaction.date)}</div>
+                              </div>
                               <Button
                                 size="sm"
                                 onClick={() => setConfirmation({
