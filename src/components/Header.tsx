@@ -18,9 +18,10 @@ import {
 type HeaderProps = {
   onNewTransactionClick?: () => void;
   onMenuClick?: () => void;
+  fluid?: boolean;
 };
 
-export function Header({ onNewTransactionClick, onMenuClick }: HeaderProps) {
+export function Header({ onNewTransactionClick, onMenuClick, fluid = false }: HeaderProps) {
   const router = useRouter();
   const auth = useAuth();
 
@@ -34,9 +35,14 @@ export function Header({ onNewTransactionClick, onMenuClick }: HeaderProps) {
 
   return (
     <header className="sticky top-0 z-50 border-b border-neutral-200 bg-white">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 md:py-4">
+      <div
+        className={[
+          "flex w-full items-center justify-between gap-4 px-4 py-3 sm:px-6 md:py-4",
+          fluid ? "" : "mx-auto max-w-7xl",
+        ].join(" ")}
+      >
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-0 items-center gap-3">
             <button
               type="button"
               onClick={onMenuClick}
@@ -47,7 +53,7 @@ export function Header({ onNewTransactionClick, onMenuClick }: HeaderProps) {
             </button>
 
             <div className="min-w-0">
-              <Link href="/" className="flex gap-2">
+              <Link href="/" className="flex items-center gap-2">
                 <h1 className="truncate text-lg font-bold leading-tight text-neutral-900 sm:text-xl">
                   Finch
                 </h1>
@@ -60,7 +66,7 @@ export function Header({ onNewTransactionClick, onMenuClick }: HeaderProps) {
                 />
               </Link>
             </div>
-            <div className="min-w-0">
+            <div className="hidden min-w-0 sm:block">
               <p className="hidden text-sm text-neutral-500 sm:block">
                 Controle suas finanças pessoais
               </p>

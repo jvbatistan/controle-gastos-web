@@ -44,6 +44,15 @@ beforeEach(() => {
         paid_total: 120,
         transactions_count: 3,
       },
+      monthly_trend: [
+        { month: 10, year: 2025, label: "out", total_amount: 0, transactions_count: 0 },
+        { month: 11, year: 2025, label: "nov", total_amount: 0, transactions_count: 0 },
+        { month: 12, year: 2025, label: "dez", total_amount: 0, transactions_count: 0 },
+        { month: 1, year: 2026, label: "jan", total_amount: 0, transactions_count: 0 },
+        { month: 2, year: 2026, label: "fev", total_amount: 0, transactions_count: 0 },
+        { month: 3, year: 2026, label: "mar", total_amount: 50, transactions_count: 1 },
+        { month: 4, year: 2026, label: "abr", total_amount: 260, transactions_count: 3 },
+      ],
       by_card: [
         {
           id: 1,
@@ -100,11 +109,12 @@ describe("DashboardPage", () => {
     expect(screen.getByText("Despesas do mês")).toBeInTheDocument();
     expect(screen.getAllByText("Em aberto").length).toBeGreaterThan(0);
     expect(screen.getByText("Pagas")).toBeInTheDocument();
-    expect(screen.getByText("Totais por cartão")).toBeInTheDocument();
-    expect(screen.getByText("Totais por categoria")).toBeInTheDocument();
+    expect(screen.getByText("Evolução mensal de despesas")).toBeInTheDocument();
+    expect(screen.getByText("Despesas por categoria")).toBeInTheDocument();
     expect(screen.getByText("Últimas despesas cadastradas")).toBeInTheDocument();
     expect(screen.getByText("Faturas e cartões")).toBeInTheDocument();
     expect(screen.getAllByText("Em construção").length).toBeGreaterThan(0);
-    expect(screen.getByText(/Receitas ainda não entram no dashboard/i)).toBeInTheDocument();
+    expect(screen.getByText("Receitas vs despesas")).toBeInTheDocument();
+    expect(screen.getByText("Saldo e economia mensal")).toBeInTheDocument();
   });
 });

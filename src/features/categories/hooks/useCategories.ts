@@ -27,9 +27,11 @@ export function useCategories({ enabled, onUnauthorized }: UseCategoriesParams) 
 
       setCategories(result.data);
     } catch (err) {
-      console.error(err);
-      setCategories([]);
-      setError("Não foi possível carregar as categorias.");
+      if (!(err instanceof DOMException && err.name === "AbortError")) {
+        console.error(err);
+        setCategories([]);
+        setError("Não foi possível carregar as categorias.");
+      }
     } finally {
       if (!signal?.aborted) setLoading(false);
     }

@@ -33,6 +33,14 @@ export type DashboardRecentExpense = {
   installments_count?: number | null;
 };
 
+export type DashboardMonthlyTrend = {
+  month: number;
+  year: number;
+  label: string;
+  total_amount: number;
+  transactions_count: number;
+};
+
 export type DashboardStatement = {
   id: number;
   card: {
@@ -56,6 +64,7 @@ export type DashboardOverview = {
     label: string;
   };
   summary: DashboardSummary;
+  monthly_trend: DashboardMonthlyTrend[];
   by_card: DashboardCardTotal[];
   by_category: DashboardCategoryTotal[];
   recent_expenses: DashboardRecentExpense[];

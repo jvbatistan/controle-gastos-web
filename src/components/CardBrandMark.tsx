@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { CreditCard } from "lucide-react";
+import Image from "next/image";
 import { getCardBrandPresentation } from "@/lib/cardBrand";
 
 type CardBrandMarkProps = {
@@ -12,11 +13,8 @@ type CardBrandMarkProps = {
 
 export function CardBrandMark({ cardName, size = "md", emphasize = false }: CardBrandMarkProps) {
   const brand = useMemo(() => getCardBrandPresentation(cardName), [cardName]);
-  const [imageFailed, setImageFailed] = useState(false);
-
-  useEffect(() => {
-    setImageFailed(false);
-  }, [brand.logoSrc, cardName]);
+  const [failedLogoSrc, setFailedLogoSrc] = useState<string | null>(null);
+  const imageFailed = Boolean(brand.logoSrc && failedLogoSrc === brand.logoSrc);
 
   const sizeClasses = {
     sm: {
@@ -63,16 +61,18 @@ export function CardBrandMark({ cardName, size = "md", emphasize = false }: Card
         style={{ backgroundColor: brand.solidColor }}
       >
         {brand.logoSrc && !imageFailed ? (
-          <img
+          <Image
             src={brand.logoSrc}
             alt={brand.logoAlt ?? `Logo do emissor ${cardName}`}
+            width={56}
+            height={56}
             className={[
               "h-full w-full object-contain",
               shouldInvertLogo ? "brightness-0 invert" : "",
               sizeClasses.imagePadding,
             ].join(" ")}
             loading="lazy"
-            onError={() => setImageFailed(true)}
+            onError={() => setFailedLogoSrc(brand.logoSrc ?? null)}
           />
         ) : (
           <div className="flex flex-col items-center justify-center gap-1 text-white">

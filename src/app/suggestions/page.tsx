@@ -3,8 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Check, Sparkles, X } from "lucide-react";
-import { Header } from "@/components/Header";
-import { Navigation } from "@/components/Navigation";
+import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -38,7 +37,6 @@ function SuggestionsPageContent() {
   const searchParams = useSearchParams();
   const auth = useAuth();
 
-  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [submittingId, setSubmittingId] = useState<number | null>(null);
   const [selectedCategoryIdBySuggestion, setSelectedCategoryIdBySuggestion] = useState<Record<number, string>>({});
@@ -139,17 +137,7 @@ function SuggestionsPageContent() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-50">
-      <Header
-        onMenuClick={() => setIsMobileNavOpen(true)}
-        onNewTransactionClick={() => router.push("/transactions")}
-      />
-
-      <div className="flex">
-        <Navigation isMobileOpen={isMobileNavOpen} onClose={() => setIsMobileNavOpen(false)} />
-
-        <main className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8">
-          <div className="mx-auto max-w-6xl space-y-6">
+    <AppLayout>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h1 className="text-3xl font-bold">Sugestões</h1>
@@ -266,10 +254,7 @@ function SuggestionsPageContent() {
                 );
               })}
             </div>
-          </div>
-        </main>
-      </div>
-    </div>
+    </AppLayout>
   );
 }
 

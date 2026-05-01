@@ -68,24 +68,17 @@ export function DropdownMenuTrigger({ asChild, children }: { asChild?: boolean; 
 
   if (asChild && React.isValidElement(children)) {
     const child = children as React.ReactElement<Record<string, unknown>>;
-    const childProps = child.props as { onClick?: React.MouseEventHandler };
-    const existingRef = child.props.ref;
-
-    return React.cloneElement(child, {
-      ref: (node: HTMLElement | null) => {
-        triggerRef.current = node;
-
-        if (typeof existingRef === "function") existingRef(node);
-        else if (existingRef && typeof existingRef === "object") {
-          (existingRef as React.MutableRefObject<HTMLElement | null>).current = node;
-        }
-      },
-      onClick: (event: React.MouseEvent) => {
-        childProps.onClick?.(event);
-        setOpen((value) => !value);
-      },
-      "aria-expanded": open,
-    });
+    return (
+      <span
+        ref={(node) => {
+          triggerRef.current = node;
+        }}
+        onClick={() => setOpen((value) => !value)}
+        className="inline-flex"
+      >
+        {React.cloneElement(child, { "aria-expanded": open })}
+      </span>
+    );
   }
 
   return (
@@ -163,7 +156,7 @@ export function DropdownMenuContent({
       window.removeEventListener("resize", updatePosition);
       window.removeEventListener("scroll", updatePosition, true);
     };
-  }, [align, mounted, open, triggerRef]);
+  }, [align, contentRef, mounted, open, triggerRef]);
 
   if (!open || !mounted) return null;
 

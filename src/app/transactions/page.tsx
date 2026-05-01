@@ -4,8 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/useAuth";
 
-import { Header } from "@/components/Header";
-import { Navigation } from "@/components/Navigation";
+import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import {
   TransactionCreateForm,
@@ -29,7 +28,6 @@ export default function TransactionsPage() {
 
   const [filters, setFilters] = useState<Filters>(defaultTransactionFilters);
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
-  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [classificationNotice, setClassificationNotice] = useState<string | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
 
@@ -140,20 +138,13 @@ export default function TransactionsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-50">
-      <Header
-        onMenuClick={() => setIsMobileNavOpen(true)}
+    <>
+      <AppLayout
         onNewTransactionClick={() => {
           setEditingTransaction(null);
           setIsTransactionModalOpen(true);
         }}
-      />
-
-      <div className="flex">
-        <Navigation isMobileOpen={isMobileNavOpen} onClose={() => setIsMobileNavOpen(false)} />
-
-        <main className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8">
-          <div className="mx-auto max-w-7xl space-y-6">
+      >
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h1 className="text-3xl font-bold">Transações</h1>
@@ -201,9 +192,7 @@ export default function TransactionsPage() {
               onReviewClassification={handleReviewClassification}
             />
             {deleting && <p className="text-xs text-neutral-500">Arquivando transação...</p>}
-          </div>
-        </main>
-      </div>
+      </AppLayout>
 
       {isTransactionModalOpen && (
         <div className="fixed inset-0 z-[60] overflow-y-auto bg-black/40 px-4 py-4 sm:py-4">
@@ -258,6 +247,6 @@ export default function TransactionsPage() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

@@ -27,9 +27,11 @@ export function useCards({ enabled, onUnauthorized }: UseCardsParams) {
 
       setCards(result.data);
     } catch (err) {
-      console.error(err);
-      setCards([]);
-      setError("Não foi possível carregar os cartões.");
+      if (!(err instanceof DOMException && err.name === "AbortError")) {
+        console.error(err);
+        setCards([]);
+        setError("Não foi possível carregar os cartões.");
+      }
     } finally {
       if (!signal?.aborted) setLoading(false);
     }

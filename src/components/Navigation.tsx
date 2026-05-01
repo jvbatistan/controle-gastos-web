@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useState } from "react";
 import { logout } from "@/lib/auth";
 import {
   X,
@@ -17,6 +18,8 @@ import {
   Hammer,
   Wallet,
   CircleDollarSign,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 
 const navItems = [
@@ -34,11 +37,26 @@ const navItems = [
 type NavigationProps = {
   isMobileOpen?: boolean;
   onClose?: () => void;
+  isCollapsed?: boolean;
+  onCollapsedChange?: (collapsed: boolean) => void;
 };
 
-export function Navigation({ isMobileOpen = false, onClose }: NavigationProps) {
+export function Navigation({
+  isMobileOpen = false,
+  onClose,
+  isCollapsed: controlledCollapsed,
+  onCollapsedChange,
+}: NavigationProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const [internalCollapsed, setInternalCollapsed] = useState(false);
+  const isCollapsed = controlledCollapsed ?? internalCollapsed;
+
+  function setIsCollapsed(nextValue: boolean | ((current: boolean) => boolean)) {
+    const nextCollapsed = typeof nextValue === "function" ? nextValue(isCollapsed) : nextValue;
+    setInternalCollapsed(nextCollapsed);
+    onCollapsedChange?.(nextCollapsed);
+  }
 
   async function handleLogout() {
     await logout();
@@ -46,7 +64,7 @@ export function Navigation({ isMobileOpen = false, onClose }: NavigationProps) {
     router.replace("/login");
   }
 
-  const navLinks = (
+  const renderNavLinks = (collapsed = false) => (
     <div className="space-y-1">
       {navItems.map((item) => {
         const active = pathname === item.href;
@@ -57,15 +75,20 @@ export function Navigation({ isMobileOpen = false, onClose }: NavigationProps) {
           return (
             <div
               key={item.label}
-              className="group flex items-start gap-3 rounded-xl px-4 py-3 text-neutral-400"
+              className={[
+                "group flex rounded-lg py-3 text-neutral-400",
+                collapsed ? "justify-center px-2" : "items-start gap-3 px-4",
+              ].join(" ")}
               aria-disabled="true"
+              title={collapsed ? `${item.label} - Em construção` : undefined}
             >
-              <div className="flex items-start gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg text-neutral-400">
-                  <Icon className="h-5 w-5" />
+              <div className={collapsed ? "flex items-center justify-center" : "flex items-start gap-3"}>
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-neutral-400">
+                  <Icon className="h-5 w-5" aria-hidden="true" />
                 </div>
 
-                <div className="min-w-0">
+                {!collapsed && (
+                  <div className="min-w-0">
                   <span className="text-sm">{item.label}</span>
                   <div className="mt-1">
                     <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-700">
@@ -74,6 +97,7 @@ export function Navigation({ isMobileOpen = false, onClose }: NavigationProps) {
                     </span>
                   </div>
                 </div>
+                )}
               </div>
             </div>
           );
@@ -84,25 +108,27 @@ export function Navigation({ isMobileOpen = false, onClose }: NavigationProps) {
             key={item.label}
             href={item.href}
             onClick={onClose}
+            title={collapsed ? item.label : undefined}
             className={[
-              "group flex items-center gap-3 rounded-xl px-4 py-3 transition-colors",
+              "group flex items-center rounded-lg py-3 transition-colors",
+              collapsed ? "justify-center px-2" : "gap-3 px-4",
               active
-                ? "bg-blue-50 text-blue-600 font-medium"
+                ? "bg-blue-50 font-medium text-blue-600"
                 : "text-neutral-700 hover:bg-neutral-50",
             ].join(" ")}
           >
             <div
               className={[
-                "flex h-9 w-9 items-center justify-center rounded-lg transition-colors",
+                "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors",
                 active
                   ? "bg-transparent text-blue-600"
                   : "bg-transparent text-neutral-500",
               ].join(" ")}
             >
-              <Icon className="h-5 w-5" />
+              <Icon className="h-5 w-5" aria-hidden="true" />
             </div>
 
-            <span className="text-sm">{item.label}</span>
+            {!collapsed && <span className="text-sm">{item.label}</span>}
           </Link>
         );
       })}
@@ -113,8 +139,24 @@ export function Navigation({ isMobileOpen = false, onClose }: NavigationProps) {
 
   return (
     <>
-      <aside className="sticky top-[73px] hidden h-[calc(100vh-73px)] w-56 border-r border-neutral-200 bg-white lg:block">
-        <div className="p-3">{navLinks}</div>
+      <aside
+        className={[
+          "fixed inset-y-0 left-0 z-40 hidden shrink-0 border-r border-neutral-200 bg-white transition-[width] duration-300 lg:block",
+          isCollapsed ? "w-[76px]" : "w-60",
+        ].join(" ")}
+      >
+        <div className="flex items-center justify-end border-b border-neutral-100 p-3">
+          <button
+            type="button"
+            onClick={() => setIsCollapsed((current) => !current)}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-800"
+            aria-label={isCollapsed ? "Expandir menu lateral" : "Recolher menu lateral"}
+            title={isCollapsed ? "Expandir menu" : "Recolher menu"}
+          >
+            {isCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+          </button>
+        </div>
+        <div className="p-3">{renderNavLinks(isCollapsed)}</div>
       </aside>
 
       {isMobileOpen && (
@@ -142,7 +184,7 @@ export function Navigation({ isMobileOpen = false, onClose }: NavigationProps) {
               </button>
             </div>
 
-            <div className="border-t border-neutral-100 p-3">{navLinks}</div>
+            <div className="border-t border-neutral-100 p-3">{renderNavLinks(false)}</div>
             <div className="mt-2 border-t border-neutral-100 px-3 pt-4">
               <Link
                 href="/profile"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectTriggerHTML } from "@/components/ui/select";
@@ -64,7 +64,13 @@ function buildFormState(initialTransaction?: Transaction | null) {
   };
 }
 
-export function TransactionCreateForm({
+export function TransactionCreateForm(props: TransactionCreateFormProps) {
+  const formKey = `${props.mode ?? "create"}-${props.initialTransaction?.id ?? "new"}`;
+
+  return <TransactionCreateFormFields key={formKey} {...props} />;
+}
+
+function TransactionCreateFormFields({
   cards,
   mode = "create",
   initialTransaction = null,
@@ -72,17 +78,18 @@ export function TransactionCreateForm({
   onSubmit,
   onCancel,
 }: TransactionCreateFormProps) {
-  const [kind, setKind] = useState<"expense" | "income">(buildFormState(initialTransaction).kind);
-  const [description, setDescription] = useState(buildFormState(initialTransaction).description);
-  const [value, setValue] = useState(buildFormState(initialTransaction).value);
-  const [date, setDate] = useState(buildFormState(initialTransaction).date);
-  const [source, setSource] = useState<"cash" | "card" | "bank">(buildFormState(initialTransaction).source);
-  const [cardId, setCardId] = useState(buildFormState(initialTransaction).cardId);
-  const [paid, setPaid] = useState(buildFormState(initialTransaction).paid);
-  const [hasInstallments, setHasInstallments] = useState(buildFormState(initialTransaction).hasInstallments);
-  const [installmentNumber, setInstallmentNumber] = useState(buildFormState(initialTransaction).installmentNumber);
-  const [installmentsCount, setInstallmentsCount] = useState(buildFormState(initialTransaction).installmentsCount);
-  const [note, setNote] = useState(buildFormState(initialTransaction).note);
+  const initialState = useMemo(() => buildFormState(initialTransaction), [initialTransaction]);
+  const [kind, setKind] = useState<"expense" | "income">(initialState.kind);
+  const [description, setDescription] = useState(initialState.description);
+  const [value, setValue] = useState(initialState.value);
+  const [date, setDate] = useState(initialState.date);
+  const [source, setSource] = useState<"cash" | "card" | "bank">(initialState.source);
+  const [cardId, setCardId] = useState(initialState.cardId);
+  const [paid, setPaid] = useState(initialState.paid);
+  const [hasInstallments, setHasInstallments] = useState(initialState.hasInstallments);
+  const [installmentNumber, setInstallmentNumber] = useState(initialState.installmentNumber);
+  const [installmentsCount, setInstallmentsCount] = useState(initialState.installmentsCount);
+  const [note, setNote] = useState(initialState.note);
   const [error, setError] = useState<string | null>(null);
   const isEditing = mode === "edit";
   const isInstallmentTransaction = Boolean(initialTransaction?.installment_group_id);
@@ -100,22 +107,6 @@ export function TransactionCreateForm({
     () => [{ value: "none", label: "Selecione um cartão" }, ...cards.map((card) => ({ value: String(card.id), label: card.name }))],
     [cards]
   );
-
-  useEffect(() => {
-    const nextState = buildFormState(initialTransaction);
-    setKind(nextState.kind);
-    setDescription(nextState.description);
-    setValue(nextState.value);
-    setDate(nextState.date);
-    setSource(nextState.source);
-    setCardId(nextState.cardId);
-    setPaid(nextState.paid);
-    setHasInstallments(nextState.hasInstallments);
-    setInstallmentNumber(nextState.installmentNumber);
-    setInstallmentsCount(nextState.installmentsCount);
-    setNote(nextState.note);
-    setError(null);
-  }, [initialTransaction, mode]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();

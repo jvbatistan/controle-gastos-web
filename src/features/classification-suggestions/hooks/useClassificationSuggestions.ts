@@ -28,9 +28,11 @@ export function useClassificationSuggestions({ enabled, onUnauthorized }: UseCla
 
         setSuggestions(result.data);
       } catch (err) {
-        console.error(err);
-        setSuggestions([]);
-        setError("Não foi possível carregar as sugestões.");
+        if (!(err instanceof DOMException && err.name === "AbortError")) {
+          console.error(err);
+          setSuggestions([]);
+          setError("Não foi possível carregar as sugestões.");
+        }
       } finally {
         if (!signal?.aborted) setLoading(false);
       }

@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Header } from "@/components/Header";
-import { Navigation } from "@/components/Navigation";
+import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/useAuth";
 import { updateProfile } from "@/lib/auth";
@@ -11,7 +10,6 @@ import { updateProfile } from "@/lib/auth";
 export default function ProfilePage() {
   const router = useRouter();
   const auth = useAuth();
-  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [success, setSuccess] = useState<string | null>(null);
@@ -56,14 +54,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-50">
-      <Header onMenuClick={() => setIsMobileNavOpen(true)} />
-
-      <div className="flex">
-        <Navigation isMobileOpen={isMobileNavOpen} onClose={() => setIsMobileNavOpen(false)} />
-
-        <main className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8">
-          <div className="mx-auto max-w-4xl space-y-6">
+    <AppLayout maxWidth="max-w-4xl" showNewTransaction={false}>
             <div>
               <h1 className="text-3xl font-bold text-neutral-900">Meu perfil</h1>
               <p className="mt-1 text-neutral-500">
@@ -141,9 +132,6 @@ export default function ProfilePage() {
                 </div>
               </aside>
             </section>
-          </div>
-        </main>
-      </div>
-    </div>
+    </AppLayout>
   );
 }

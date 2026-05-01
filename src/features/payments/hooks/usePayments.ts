@@ -29,9 +29,11 @@ export function usePayments({ month, year, enabled, onUnauthorized }: UsePayment
 
       setOverview(result.data);
     } catch (err) {
-      console.error(err);
-      setOverview(null);
-      setError("Não foi possível carregar os pagamentos.");
+      if (!(err instanceof DOMException && err.name === "AbortError")) {
+        console.error(err);
+        setOverview(null);
+        setError("Não foi possível carregar os pagamentos.");
+      }
     } finally {
       if (!signal?.aborted) setLoading(false);
     }

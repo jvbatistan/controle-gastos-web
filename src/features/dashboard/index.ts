@@ -5,6 +5,7 @@ export type {
   DashboardSummary,
   DashboardCardTotal,
   DashboardCategoryTotal,
+  DashboardMonthlyTrend,
   DashboardRecentExpense,
   DashboardStatement,
 } from "./types/dashboard.types";

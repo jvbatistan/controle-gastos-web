@@ -3,8 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pencil, Plus, Trash2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { Header } from "@/components/Header";
-import { Navigation } from "@/components/Navigation";
+import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectTriggerHTML } from "@/components/ui/select";
@@ -24,7 +23,6 @@ const initialForm = { name: "", icon: "pie-chart" };
 export default function CategoriesPage() {
   const router = useRouter();
   const auth = useAuth();
-  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [form, setForm] = useState(initialForm);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
@@ -145,14 +143,8 @@ export default function CategoriesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-50">
-      <Header onMenuClick={() => setIsMobileNavOpen(true)} onNewTransactionClick={() => router.push("/transactions")} />
-
-      <div className="flex">
-        <Navigation isMobileOpen={isMobileNavOpen} onClose={() => setIsMobileNavOpen(false)} />
-
-        <main className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8">
-          <div className="mx-auto max-w-6xl space-y-6">
+    <>
+      <AppLayout>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h1 className="text-2xl font-bold text-neutral-900 sm:text-3xl">Categorias</h1>
@@ -331,9 +323,7 @@ export default function CategoriesPage() {
                 )}
               </CardContent>
             </Card>
-          </div>
-        </main>
-      </div>
+      </AppLayout>
 
       {isDialogOpen && (
         <div className="fixed inset-0 z-[60] overflow-y-auto bg-black/40 px-4 py-6">
@@ -411,6 +401,6 @@ export default function CategoriesPage() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
