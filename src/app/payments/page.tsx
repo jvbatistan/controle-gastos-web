@@ -75,7 +75,7 @@ type PaymentConfirmation =
 export default function PaymentsPage() {
   const router = useRouter();
   const auth = useAuth();
-  const [activeTab, setActiveTab] = useState<"statements" | "loose">("statements");
+  const [activeTab, setActiveTab] = useState<"statements" | "loose" | "ignored">("statements");
   const [month, setMonth] = useState(String(new Date().getMonth() + 1));
   const [year, setYear] = useState(String(currentYear));
   const [message, setMessage] = useState<string | null>(null);
@@ -100,6 +100,7 @@ export default function PaymentsPage() {
     [overview]
   );
   const looseExpenses = overview?.loose_expenses;
+  const ignoredPayments = overview?.ignored_payments;
 
   const outstandingStatements = useMemo(
     () => statements.filter((statement) => !statement.paid),
@@ -112,6 +113,8 @@ export default function PaymentsPage() {
   );
 
   const totalLooseExpenses = Number(looseExpenses?.total_amount ?? 0);
+  const totalIgnoredPayments = Number(ignoredPayments?.statements_total_amount ?? 0) + Number(ignoredPayments?.loose_expenses.total_amount ?? 0);
+  const ignoredItemsCount = Number(ignoredPayments?.statements_count ?? 0) + Number(ignoredPayments?.loose_expenses.transactions_count ?? 0);
   const isSubmittingLooseExpenses =
     submittingKey === "loose-expenses" ||
     submittingKey?.startsWith("loose-expense-") === true ||
@@ -269,7 +272,7 @@ export default function PaymentsPage() {
               <p className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p>
             )}
 
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-6">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-4 md:gap-6">
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium text-neutral-500">Faturas em aberto</CardTitle>
@@ -301,9 +304,21 @@ export default function PaymentsPage() {
                   </p>
                 </CardContent>
               </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-neutral-500">Ficaram devendo</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-amber-600 sm:text-3xl">{formatBRL(totalIgnoredPayments)}</div>
+                  <p className="mt-1 text-xs text-neutral-500">
+                    {ignoredItemsCount} item(ns) fora do fluxo
+                  </p>
+                </CardContent>
+              </Card>
             </div>
 
-            <div className="inline-flex w-full max-w-[400px] rounded-2xl border border-neutral-200 bg-white p-1 shadow-sm">
+            <div className="inline-flex w-full max-w-[520px] rounded-2xl border border-neutral-200 bg-white p-1 shadow-sm">
               <button
                 type="button"
                 onClick={() => setActiveTab("statements")}
@@ -327,6 +342,18 @@ export default function PaymentsPage() {
                 ].join(" ")}
               >
                 Avulsas
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("ignored")}
+                className={[
+                  "flex-1 rounded-xl px-4 py-2 text-sm transition",
+                  activeTab === "ignored"
+                    ? "bg-neutral-900 text-white"
+                    : "text-neutral-600 hover:bg-neutral-100",
+                ].join(" ")}
+              >
+                Devendo
               </button>
             </div>
 
@@ -457,7 +484,7 @@ export default function PaymentsPage() {
                   )}
                 </CardContent>
               </Card>
-            ) : (
+            ) : activeTab === "loose" ? (
               <Card>
                 <CardHeader>
                   <CardTitle>Despesas avulsas</CardTitle>
@@ -563,6 +590,117 @@ export default function PaymentsPage() {
                           </div>
                         );
                       })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Dívidas que ficaram para depois</CardTitle>
+                  <p className="mt-1 text-sm text-neutral-500">
+                    Itens removidos do fluxo de pagamento em {periodLabel(month, year)}, sem marcação de pagamento.
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  {loading ? (
+                    <p className="text-sm text-neutral-500">Carregando dívidas pendentes...</p>
+                  ) : !ignoredPayments || ignoredItemsCount === 0 ? (
+                    <div className="py-12 text-center">
+                      <AlertCircle className="mx-auto mb-4 h-12 w-12 text-neutral-300" />
+                      <h3 className="mb-2 text-lg font-medium text-neutral-900">Nada ficou devendo</h3>
+                      <p className="text-neutral-500">Não há faturas ou despesas avulsas fora do fluxo neste período.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
+                        <div className="text-sm font-medium text-amber-800">Total fora do fluxo</div>
+                        <div className="mt-1 text-3xl font-bold text-amber-900">{formatBRL(totalIgnoredPayments)}</div>
+                        <p className="mt-2 text-sm text-amber-800">
+                          {ignoredItemsCount} item(ns) mantidos como dívida em aberto.
+                        </p>
+                      </div>
+
+                      <section className="space-y-3">
+                        <div>
+                          <h3 className="font-semibold text-neutral-900">Faturas</h3>
+                          <p className="text-sm text-neutral-500">
+                            {ignoredPayments.statements_count} fatura(s) fora do somatório do mês.
+                          </p>
+                        </div>
+
+                        {ignoredPayments.statements.length === 0 ? (
+                          <div className="rounded-xl border border-neutral-200 px-4 py-5 text-sm text-neutral-500">
+                            Nenhuma fatura ficou devendo neste período.
+                          </div>
+                        ) : (
+                          ignoredPayments.statements.map((statement) => {
+                            const brand = getCardBrandPresentation(statement.card.name);
+
+                            return (
+                              <div
+                                key={statement.id}
+                                className="flex flex-col gap-3 rounded-xl border border-neutral-200 p-4 hover:bg-neutral-50 sm:flex-row sm:items-center sm:justify-between"
+                              >
+                                <div className="flex items-center gap-3">
+                                  <CardBrandMark cardName={statement.card.name} size="md" emphasize />
+                                  <div>
+                                    <div className="font-medium text-neutral-900">{statement.card.name}</div>
+                                    <div className="text-sm text-neutral-500">
+                                      Fecha dia {statement.closing_day} • Vence dia {statement.due_day}
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <div className="text-lg font-bold" style={{ color: brand.solidColor }}>
+                                    {formatBRL(statement.remaining_amount)}
+                                  </div>
+                                  <div className="mt-1 text-sm text-neutral-500">{statement.transactions_count} transações</div>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </section>
+
+                      <section className="space-y-3">
+                        <div>
+                          <h3 className="font-semibold text-neutral-900">Avulsas</h3>
+                          <p className="text-sm text-neutral-500">
+                            {ignoredPayments.loose_expenses.transactions_count} despesa(s) avulsa(s) fora do somatório do mês.
+                          </p>
+                        </div>
+
+                        {ignoredPayments.loose_expenses.transactions.length === 0 ? (
+                          <div className="rounded-xl border border-neutral-200 px-4 py-5 text-sm text-neutral-500">
+                            Nenhuma despesa avulsa ficou devendo neste período.
+                          </div>
+                        ) : (
+                          ignoredPayments.loose_expenses.transactions.map((transaction) => {
+                            const installmentLabel = renderInstallmentLabel(transaction);
+
+                            return (
+                              <div
+                                key={transaction.id}
+                                className="flex flex-col gap-3 rounded-xl border border-neutral-200 p-4 hover:bg-neutral-50 sm:flex-row sm:items-center sm:justify-between"
+                              >
+                                <div>
+                                  <div className="font-medium text-neutral-900">
+                                    {transaction.description} {installmentLabel}
+                                  </div>
+                                  {transaction.note && (
+                                    <div className="mt-1 text-xs text-neutral-500">{transaction.note}</div>
+                                  )}
+                                </div>
+                                <div className="text-right">
+                                  <div className="text-lg font-bold text-neutral-900">{formatBRL(transaction.value)}</div>
+                                  <div className="mt-1 text-sm text-neutral-500">{formatDateBR(transaction.date)}</div>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </section>
                     </div>
                   )}
                 </CardContent>

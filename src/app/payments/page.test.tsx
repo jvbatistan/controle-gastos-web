@@ -87,6 +87,33 @@ beforeEach(() => {
           { id: 2, description: "UBER", value: 40, date: "2026-03-11", source: "bank", paid: false },
         ],
       },
+      ignored_payments: {
+        period_label: "03/2026",
+        statements_count: 1,
+        statements_total_amount: 300,
+        statements: [
+          {
+            id: 2,
+            card: { id: 1, name: "NUBANK" },
+            billing_statement: "2026-03-01",
+            total_amount: 300,
+            paid_amount: 0,
+            remaining_amount: 300,
+            paid: false,
+            ignored_at: "2026-03-12T10:00:00Z",
+            due_day: 15,
+            closing_day: 8,
+            transactions_count: 4,
+          },
+        ],
+        loose_expenses: {
+          transactions_count: 1,
+          total_amount: 65,
+          transactions: [
+            { id: 3, description: "FARMACIA", value: 65, date: "2026-03-12", source: "cash", paid: false, payment_ignored_at: "2026-03-12T10:00:00Z" },
+          ],
+        },
+      },
     },
   });
 });
@@ -180,6 +207,20 @@ describe("PaymentsPage", () => {
       expect(refetch).toHaveBeenCalled();
       expect(screen.getByText("2 despesas avulsas marcadas como pagas.")).toBeInTheDocument();
     });
+  });
+
+  it("shows debts removed from the payment flow", async () => {
+    const user = userEvent.setup();
+    render(<PaymentsPage />);
+
+    await user.click(screen.getByRole("button", { name: /Devendo/i }));
+
+    expect(screen.getByText("Dívidas que ficaram para depois")).toBeInTheDocument();
+    expect(screen.getByText("Total fora do fluxo")).toBeInTheDocument();
+    expect(screen.getAllByText("R$ 365,00")).toHaveLength(2);
+    expect(screen.getByText("1 fatura(s) fora do somatório do mês.")).toBeInTheDocument();
+    expect(screen.getByText("1 despesa(s) avulsa(s) fora do somatório do mês.")).toBeInTheDocument();
+    expect(screen.getByText("FARMACIA")).toBeInTheDocument();
   });
 
   it("blocks loose-expense actions while a loose-expense request is in flight", async () => {

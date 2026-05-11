@@ -43,4 +43,15 @@ export type PaymentsOverview = {
     paid: boolean;
     transactions: LooseExpenseTransaction[];
   };
+  ignored_payments: {
+    period_label: string;
+    statements_count: number;
+    statements_total_amount: number;
+    statements: PaymentStatement[];
+    loose_expenses: {
+      transactions_count: number;
+      total_amount: number;
+      transactions: LooseExpenseTransaction[];
+    };
+  };
 };
