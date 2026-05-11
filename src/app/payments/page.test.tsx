@@ -7,6 +7,7 @@ const replace = vi.fn();
 const refetch = vi.fn();
 const payCardStatement = vi.fn();
 const ignoreCardStatement = vi.fn();
+const ignoreLooseExpense = vi.fn();
 const payLooseExpense = vi.fn();
 const payLooseExpenses = vi.fn();
 const usePayments = vi.fn();
@@ -32,6 +33,7 @@ vi.mock("@/features/payments", () => ({
   usePayments: (...args: unknown[]) => usePayments(...args),
   payCardStatement: (...args: unknown[]) => payCardStatement(...args),
   ignoreCardStatement: (...args: unknown[]) => ignoreCardStatement(...args),
+  ignoreLooseExpense: (...args: unknown[]) => ignoreLooseExpense(...args),
   payLooseExpense: (...args: unknown[]) => payLooseExpense(...args),
   payLooseExpenses: (...args: unknown[]) => payLooseExpenses(...args),
 }));
@@ -42,6 +44,10 @@ beforeEach(() => {
   refetch.mockReset().mockResolvedValue(undefined);
   payCardStatement.mockReset().mockResolvedValue({ status: 200, data: { card: { name: "NUBANK" } } });
   ignoreCardStatement.mockReset().mockResolvedValue({ status: 200, data: { id: 1, ignored_at: "2026-03-12T10:00:00Z" } });
+  ignoreLooseExpense.mockReset().mockResolvedValue({
+    status: 200,
+    data: { id: 1, description: "MERCADO", value: 80, date: "2026-03-10", source: "cash", paid: false, payment_ignored_at: "2026-03-12T10:00:00Z" },
+  });
   payLooseExpense.mockReset().mockResolvedValue({
     status: 200,
     data: { id: 1, description: "MERCADO", value: 80, date: "2026-03-10", source: "cash", paid: true },
@@ -146,6 +152,21 @@ describe("PaymentsPage", () => {
     });
   });
 
+  it("switches to loose expenses and removes one expense from the payment flow", async () => {
+    const user = userEvent.setup();
+    render(<PaymentsPage />);
+
+    await user.click(screen.getByRole("button", { name: /Avulsas/i }));
+    await user.click(screen.getAllByRole("button", { name: /Não pagar/i })[0]);
+    await user.click(screen.getByRole("button", { name: /Confirmar não pagamento/i }));
+
+    await waitFor(() => {
+      expect(ignoreLooseExpense).toHaveBeenCalledWith(1, expect.any(Number), expect.any(Number));
+      expect(refetch).toHaveBeenCalled();
+      expect(screen.getByText(/Despesa "MERCADO" removida do fluxo de pagamento/i)).toBeInTheDocument();
+    });
+  });
+
   it("switches to loose expenses and pays all expenses in batch", async () => {
     const user = userEvent.setup();
     render(<PaymentsPage />);
@@ -169,10 +190,13 @@ describe("PaymentsPage", () => {
     await user.click(screen.getByRole("button", { name: /Avulsas/i }));
     const batchButton = screen.getByRole("button", { name: /Pagar todas as despesas/i });
     const itemButtons = screen.getAllByRole("button", { name: /Pagar despesa/i });
+    const ignoreButtons = screen.getAllByRole("button", { name: /Não pagar/i });
 
     expect(batchButton).toBeEnabled();
     expect(itemButtons[0]).toBeEnabled();
     expect(itemButtons[1]).toBeEnabled();
+    expect(ignoreButtons[0]).toBeEnabled();
+    expect(ignoreButtons[1]).toBeEnabled();
 
     await user.click(itemButtons[0]);
     await user.click(screen.getByRole("button", { name: /Confirmar pagamento da despesa/i }));
@@ -182,6 +206,8 @@ describe("PaymentsPage", () => {
       expect(batchButton).toBeDisabled();
       expect(itemButtons[0]).toBeDisabled();
       expect(itemButtons[1]).toBeDisabled();
+      expect(ignoreButtons[0]).toBeDisabled();
+      expect(ignoreButtons[1]).toBeDisabled();
     });
   });
 });

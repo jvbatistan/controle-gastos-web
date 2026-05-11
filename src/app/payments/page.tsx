@@ -16,7 +16,7 @@ import { CardBrandMark } from "@/components/CardBrandMark";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectTriggerHTML } from "@/components/ui/select";
-import { ignoreCardStatement, payCardStatement, payLooseExpense, payLooseExpenses, usePayments } from "@/features/payments";
+import { ignoreCardStatement, ignoreLooseExpense, payCardStatement, payLooseExpense, payLooseExpenses, usePayments } from "@/features/payments";
 import { getCardBrandPresentation } from "@/lib/cardBrand";
 import { useAuth } from "@/lib/useAuth";
 
@@ -69,6 +69,7 @@ type PaymentConfirmation =
   | { kind: "statement"; statementId: number; cardName: string; amount: number }
   | { kind: "ignore-statement"; statementId: number; cardName: string; amount: number; period: string }
   | { kind: "loose-expense"; transactionId: number; description: string; amount: number }
+  | { kind: "ignore-loose-expense"; transactionId: number; description: string; amount: number; period: string }
   | { kind: "loose-expenses"; count: number; totalAmount: number; period: string };
 
 export default function PaymentsPage() {
@@ -111,7 +112,10 @@ export default function PaymentsPage() {
   );
 
   const totalLooseExpenses = Number(looseExpenses?.total_amount ?? 0);
-  const isSubmittingLooseExpenses = submittingKey === "loose-expenses" || submittingKey?.startsWith("loose-expense-") === true;
+  const isSubmittingLooseExpenses =
+    submittingKey === "loose-expenses" ||
+    submittingKey?.startsWith("loose-expense-") === true ||
+    submittingKey?.startsWith("ignore-loose-expense-") === true;
 
   async function submitPayStatement(statementId: number) {
     try {
@@ -167,6 +171,24 @@ export default function PaymentsPage() {
     }
   }
 
+  async function submitIgnoreLooseExpense(transactionId: number, description: string) {
+    try {
+      setSubmittingKey(`ignore-loose-expense-${transactionId}`);
+      setMessage(null);
+      const result = await ignoreLooseExpense(transactionId, Number(month), Number(year));
+      if (result.status === 401) {
+        handleUnauthorized();
+        return;
+      }
+      setMessage(`Despesa "${description}" removida do fluxo de pagamento de ${periodLabel(month, year)}.`);
+      await refetch();
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Não foi possível remover a despesa avulsa do fluxo de pagamento.");
+    } finally {
+      setSubmittingKey(null);
+    }
+  }
+
   async function submitPayLooseExpenses() {
     try {
       setSubmittingKey("loose-expenses");
@@ -203,6 +225,11 @@ export default function PaymentsPage() {
 
     if (current.kind === "loose-expense") {
       await submitPayLooseExpense(current.transactionId, current.description);
+      return;
+    }
+
+    if (current.kind === "ignore-loose-expense") {
+      await submitIgnoreLooseExpense(current.transactionId, current.description);
       return;
     }
 
@@ -481,6 +508,7 @@ export default function PaymentsPage() {
                       <div className="mb-2 text-sm font-medium text-neutral-500">Descrição / Valor</div>
                       {looseExpenses.transactions.map((transaction) => {
                         const isSubmitting = submittingKey === `loose-expense-${transaction.id}`;
+                        const isIgnoring = submittingKey === `ignore-loose-expense-${transaction.id}`;
                         const installmentLabel = renderInstallmentLabel(transaction);
 
                         return (
@@ -496,24 +524,41 @@ export default function PaymentsPage() {
                                 <div className="mt-1 text-xs text-neutral-500">{transaction.note}</div>
                               )}
                             </div>
-                            <div className="flex items-center justify-between gap-4 sm:justify-end">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
                               <div className="text-right">
                                 <div className="text-lg font-bold text-neutral-900">{formatBRL(transaction.value)}</div>
                                 <div className="mt-1 text-sm text-neutral-500">{formatDateBR(transaction.date)}</div>
                               </div>
-                              <Button
-                                size="sm"
-                                onClick={() => setConfirmation({
-                                  kind: "loose-expense",
-                                  transactionId: transaction.id,
-                                  description: transaction.description,
-                                  amount: Number(transaction.value),
-                                })}
-                                disabled={isSubmittingLooseExpenses}
-                                className="bg-emerald-600 text-white hover:bg-emerald-700"
-                              >
-                                {isSubmitting ? "Registrando..." : "Pagar despesa"}
-                              </Button>
+                              <div className="flex flex-col gap-2 sm:w-[132px]">
+                                <Button
+                                  size="sm"
+                                  onClick={() => setConfirmation({
+                                    kind: "loose-expense",
+                                    transactionId: transaction.id,
+                                    description: transaction.description,
+                                    amount: Number(transaction.value),
+                                  })}
+                                  disabled={isSubmittingLooseExpenses}
+                                  className="bg-emerald-600 text-white hover:bg-emerald-700"
+                                >
+                                  {isSubmitting ? "Registrando..." : "Pagar despesa"}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => setConfirmation({
+                                    kind: "ignore-loose-expense",
+                                    transactionId: transaction.id,
+                                    description: transaction.description,
+                                    amount: Number(transaction.value),
+                                    period: periodLabel(month, year),
+                                  })}
+                                  disabled={isSubmittingLooseExpenses}
+                                  className="border-amber-300 text-amber-700 hover:bg-amber-50 hover:text-amber-800"
+                                >
+                                  {isIgnoring ? "Atualizando..." : "Não pagar"}
+                                </Button>
+                              </div>
                             </div>
                           </div>
                         );
@@ -539,7 +584,9 @@ export default function PaymentsPage() {
                           ? "Confirmar não pagamento da fatura"
                           : confirmation.kind === "loose-expense"
                             ? "Confirmar pagamento da despesa"
-                            : "Confirmar pagamento em lote"}
+                            : confirmation.kind === "ignore-loose-expense"
+                              ? "Confirmar não pagamento da despesa"
+                              : "Confirmar pagamento em lote"}
                     </h2>
                     <p className="mt-1 text-sm text-neutral-500">
                       {confirmation.kind === "statement"
@@ -548,7 +595,9 @@ export default function PaymentsPage() {
                           ? `Você está prestes a retirar a fatura do cartão ${confirmation.cardName} do fluxo de pagamento de ${confirmation.period}. Ela deixará de compor os totais desse período sem ser marcada como paga.`
                           : confirmation.kind === "loose-expense"
                             ? `Você está prestes a marcar a despesa ${confirmation.description} como paga no valor de ${formatBRL(confirmation.amount)}.`
-                            : `Você está prestes a quitar ${confirmation.count} despesa(s) avulsa(s) pendentes de ${confirmation.period}, totalizando ${formatBRL(confirmation.totalAmount)}.`}
+                            : confirmation.kind === "ignore-loose-expense"
+                              ? `Você está prestes a retirar a despesa ${confirmation.description} do fluxo de pagamento de ${confirmation.period}. Ela deixará de compor os totais desse período sem ser marcada como paga.`
+                              : `Você está prestes a quitar ${confirmation.count} despesa(s) avulsa(s) pendentes de ${confirmation.period}, totalizando ${formatBRL(confirmation.totalAmount)}.`}
                     </p>
                   </div>
                   <Button type="button" variant="outline" size="sm" onClick={() => setConfirmation(null)} disabled={submittingKey !== null}>
@@ -573,7 +622,9 @@ export default function PaymentsPage() {
                         ? "Confirmar não pagamento"
                         : confirmation.kind === "loose-expense"
                           ? "Confirmar pagamento da despesa"
-                          : "Confirmar pagamento em lote"}
+                          : confirmation.kind === "ignore-loose-expense"
+                            ? "Confirmar não pagamento"
+                            : "Confirmar pagamento em lote"}
                   </Button>
                 </div>
               </div>

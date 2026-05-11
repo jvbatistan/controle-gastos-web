@@ -27,6 +27,7 @@ export type LooseExpenseTransaction = {
   source: "card" | "cash" | "bank";
   category_id?: number | null;
   paid: boolean;
+  payment_ignored_at?: string | null;
 };
 
 export type PaymentsOverview = {
