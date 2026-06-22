@@ -25,6 +25,8 @@ export type DashboardRecentExpense = {
   id: number;
   description: string;
   value: number;
+  signed_value?: number;
+  refund?: boolean;
   date: string;
   paid: boolean;
   card?: { id: number; name: string } | null;

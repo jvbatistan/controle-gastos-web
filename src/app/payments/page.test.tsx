@@ -69,9 +69,19 @@ beforeEach(() => {
           card: { id: 1, name: "NUBANK" },
           billing_statement: "2026-03-01",
           total_amount: 300,
-          paid_amount: 0,
-          remaining_amount: 300,
+          paid_amount: 30,
+          remaining_amount: 270,
           paid: false,
+          payments: [
+            {
+              id: 10,
+              amount: 30,
+              paid_at: "2026-03-10T12:00:00Z",
+              description: "Pagamento recebido",
+              source: "converted_transaction",
+              original_transaction_id: 99,
+            },
+          ],
           due_day: 15,
           closing_day: 8,
           transactions_count: 4,
@@ -100,6 +110,7 @@ beforeEach(() => {
             paid_amount: 0,
             remaining_amount: 300,
             paid: false,
+            payments: [],
             ignored_at: "2026-03-12T10:00:00Z",
             due_day: 15,
             closing_day: 8,
@@ -131,6 +142,14 @@ describe("PaymentsPage", () => {
       expect(refetch).toHaveBeenCalled();
       expect(screen.getByText('Fatura do cartão "NUBANK" quitada com sucesso.')).toBeInTheDocument();
     });
+  });
+
+  it("shows statement payment history", () => {
+    render(<PaymentsPage />);
+
+    expect(screen.getByText("Pagamentos registrados")).toBeInTheDocument();
+    expect(screen.getByText(/Pagamento recebido/i)).toBeInTheDocument();
+    expect(screen.getByText("R$ 30,00")).toBeInTheDocument();
   });
 
   it("allows ignoring a statement for the selected period", async () => {

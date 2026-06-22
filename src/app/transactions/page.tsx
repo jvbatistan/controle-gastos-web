@@ -21,6 +21,7 @@ import {
   type TransactionFiltersType as Filters,
 } from "@/features/transactions";
 import { useCards } from "@/features/cards";
+import { usePayments } from "@/features/payments";
 
 export default function TransactionsPage() {
   const router = useRouter();
@@ -68,6 +69,29 @@ export default function TransactionsPage() {
     enabled: auth.status === "authenticated",
     onUnauthorized: handleUnauthorized,
   });
+  const hasStatementFilters = filters.cardId !== "all" && filters.cardId !== "none" && filters.month !== "all" && filters.year !== "all";
+  const selectedMonth = filters.month === "all" ? new Date().getMonth() + 1 : Number(filters.month);
+  const selectedYear = filters.year === "all" ? new Date().getFullYear() : Number(filters.year);
+  const {
+    overview: paymentsOverview,
+    loading: statementLoading,
+    error: statementError,
+    refetch: refetchPayments,
+  } = usePayments({
+    month: selectedMonth,
+    year: selectedYear,
+    enabled: auth.status === "authenticated" && hasStatementFilters,
+    onUnauthorized: handleUnauthorized,
+  });
+  const selectedStatement = useMemo(() => {
+    if (!hasStatementFilters || !paymentsOverview) return null;
+
+    const cardId = Number(filters.cardId);
+    return [
+      ...paymentsOverview.statements,
+      ...paymentsOverview.ignored_payments.statements,
+    ].find((statement) => statement.card.id === cardId) ?? null;
+  }, [filters.cardId, hasStatementFilters, paymentsOverview]);
   const handleCreateTransaction = useCallback(
     async (payload: TransactionPayload) => {
       const created = await createTransaction(payload);
@@ -85,11 +109,12 @@ export default function TransactionsPage() {
         }
 
         refetch();
+        if (hasStatementFilters) void refetchPayments();
         setEditingTransaction(null);
         setIsTransactionModalOpen(false);
       }
     },
-    [createTransaction, refetch]
+    [createTransaction, hasStatementFilters, refetch, refetchPayments]
   );
   const handleUpdateTransaction = useCallback(
     async (payload: TransactionPayload) => {
@@ -100,10 +125,11 @@ export default function TransactionsPage() {
         setClassificationNotice(null);
         setEditingTransaction(null);
         refetch();
+        if (hasStatementFilters) void refetchPayments();
         setIsTransactionModalOpen(false);
       }
     },
-    [editingTransaction, refetch, updateTransaction]
+    [editingTransaction, hasStatementFilters, refetch, refetchPayments, updateTransaction]
   );
   const handleDeleteTransaction = useCallback(
     async (tx: Transaction) => {
@@ -113,9 +139,12 @@ export default function TransactionsPage() {
       if (!confirmed) return;
 
       const ok = await deleteTransaction(tx.id);
-      if (ok) refetch();
+      if (ok) {
+        refetch();
+        if (hasStatementFilters) void refetchPayments();
+      }
     },
-    [deleteTransaction, refetch]
+    [deleteTransaction, hasStatementFilters, refetch, refetchPayments]
   );
   const { cards, error: cardsError } = useCards({
     enabled: auth.status === "authenticated",
@@ -164,7 +193,15 @@ export default function TransactionsPage() {
               </p>
             )}
 
-            <TransactionStats items={items} />
+            <TransactionStats items={items} statement={selectedStatement} />
+            {hasStatementFilters && statementLoading && (
+              <p className="text-xs text-neutral-500">Atualizando saldo da fatura...</p>
+            )}
+            {hasStatementFilters && statementError && (
+              <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+                {statementError}
+              </p>
+            )}
             <TransactionFilters
               filters={filters}
               cards={cards.map((card) => ({ id: String(card.id), name: card.name }))}

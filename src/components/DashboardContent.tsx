@@ -434,6 +434,7 @@ function TransactionList({ overview }: Props) {
           <div className="divide-y divide-neutral-100">
             {overview.recent_expenses.slice(0, 8).map((expense) => {
               const label = installmentLabel(expense);
+              const isRefund = Boolean(expense.refund);
               return (
                 <div key={expense.id} className="px-5 py-3.5 transition hover:bg-indigo-50/40 sm:px-6">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -458,7 +459,10 @@ function TransactionList({ overview }: Props) {
                       <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${expense.paid ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-700"}`}>
                         {expense.paid ? "Paga" : "Em aberto"}
                       </span>
-                      <span className="min-w-[100px] text-right font-bold text-neutral-950 tabular-nums">{formatBRL(Number(expense.value))}</span>
+                      <span className={`min-w-[100px] text-right font-bold tabular-nums ${isRefund ? "text-emerald-600" : "text-neutral-950"}`}>
+                        {isRefund ? "+" : ""}
+                        {formatBRL(Math.abs(Number(expense.value)))}
+                      </span>
                     </div>
                   </div>
                 </div>

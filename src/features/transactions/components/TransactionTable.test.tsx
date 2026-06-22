@@ -61,4 +61,22 @@ describe("TransactionTable", () => {
 
     expect(screen.getByRole("menuitem", { name: /Arquivar/i })).toBeInTheDocument();
   });
+
+  it("renders refunds as green credits without a duplicated negative sign", () => {
+    const refundTransaction: Transaction = {
+      ...baseTransaction,
+      id: 2,
+      value: 6.92,
+      signed_value: -6.92,
+      refund: true,
+      source: "card",
+      card: { id: 7, name: "NUBANK" },
+    };
+
+    const { container } = render(<TransactionTable items={[refundTransaction]} loading={false} />);
+
+    expect(container).not.toHaveTextContent("- -R$ 6,92");
+    expect(screen.getAllByText(/\+\s*R\$\s*6,92/).length).toBeGreaterThan(0);
+    expect(screen.getAllByTitle("Estorno / crédito").length).toBeGreaterThan(0);
+  });
 });

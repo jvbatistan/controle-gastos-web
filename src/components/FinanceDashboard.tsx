@@ -157,6 +157,7 @@ export function FinanceDashboard({ overview }: FinanceDashboardProps) {
               <div className="space-y-3">
                 {recent_expenses.map((expense) => {
                   const label = installmentLabel(expense);
+                  const isRefund = Boolean(expense.refund);
 
                   return (
                     <div key={expense.id} className="flex flex-col gap-2 rounded-2xl border border-neutral-200 p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -179,7 +180,10 @@ export function FinanceDashboard({ overview }: FinanceDashboardProps) {
                         >
                           {expense.paid ? "Paga" : "Em aberto"}
                         </span>
-                        <span className="font-semibold text-neutral-900">{formatBRL(expense.value)}</span>
+                        <span className={`font-semibold ${isRefund ? "text-emerald-600" : "text-neutral-900"}`}>
+                          {isRefund ? "+" : ""}
+                          {formatBRL(Math.abs(Number(expense.value)))}
+                        </span>
                       </div>
                     </div>
                   );

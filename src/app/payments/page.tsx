@@ -52,6 +52,10 @@ function formatDateBR(dateISO: string) {
   return new Date(`${dateISO}T12:00:00`).toLocaleDateString("pt-BR");
 }
 
+function formatDateTimeBR(dateISO: string) {
+  return new Date(dateISO).toLocaleDateString("pt-BR");
+}
+
 function periodLabel(month: string, year: string) {
   const monthLabel = monthOptions.find((option) => option.value === month)?.label ?? month;
   return `${monthLabel}/${year}`;
@@ -478,6 +482,22 @@ export default function PaymentsPage() {
                               )}
                             </div>
                           </div>
+
+                          {statement.payments && statement.payments.length > 0 && (
+                            <div className="mt-4 rounded-xl border border-emerald-100 bg-emerald-50/70 p-3">
+                              <div className="mb-2 text-sm font-semibold text-emerald-900">Pagamentos registrados</div>
+                              <div className="space-y-2">
+                                {statement.payments.map((payment) => (
+                                  <div key={payment.id} className="flex flex-col gap-1 text-sm text-emerald-900 sm:flex-row sm:items-center sm:justify-between">
+                                    <span className="truncate">
+                                      {formatDateTimeBR(payment.paid_at)} · {payment.description || "Pagamento da fatura"}
+                                    </span>
+                                    <span className="font-bold tabular-nums">{formatBRL(Number(payment.amount))}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       );
                     })

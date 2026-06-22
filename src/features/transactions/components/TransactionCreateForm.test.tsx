@@ -60,6 +60,43 @@ describe("TransactionCreateForm", () => {
     });
   });
 
+  it("submits card refunds and disables installment fields for them", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <TransactionCreateForm
+        cards={[{ id: 7, name: "Nubank" }]}
+        onSubmit={onSubmit}
+      />
+    );
+
+    await user.type(screen.getByPlaceholderText("Ex: Compra no supermercado"), "Uber estorno");
+    await user.type(screen.getByPlaceholderText("0,00"), "692");
+    fireEvent.change(screen.getByDisplayValue("Dinheiro"), { target: { value: "card" } });
+    fireEvent.change(screen.getByDisplayValue("Selecione um cartão"), { target: { value: "7" } });
+
+    await user.click(screen.getByLabelText("Estorno / crédito no cartão"));
+
+    expect(screen.getByLabelText("Compra parcelada")).toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: "Salvar despesa" }));
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          description: "Uber estorno",
+          value: 6.92,
+          refund: true,
+          source: "card",
+          card_id: 7,
+          installment_number: null,
+          installments_count: null,
+        })
+      );
+    });
+  });
+
   it("loads initial values in edit mode and submits an update payload without installment fields", async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn().mockResolvedValue(undefined);

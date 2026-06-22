@@ -57,7 +57,23 @@ function formatDateBR(dateISO: string) {
 }
 
 function formatBRL(value: number) {
-  return Number(value).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  return Math.abs(Number(value)).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+function getValueDisplay(transaction: Transaction) {
+  const isRefund = Boolean(transaction.refund);
+  const isCredit = transaction.kind === "income" || isRefund;
+  const amount = Math.abs(Number(transaction.value || transaction.signed_value || 0));
+
+  return {
+    amount,
+    sign: isCredit ? "+" : "-",
+    title: isRefund ? "Estorno / crédito" : transaction.kind === "expense" ? "Despesa" : "Receita",
+    toneClassName: isCredit ? "text-emerald-600" : "text-rose-600",
+    iconClassName: isCredit ? "bg-emerald-100 text-emerald-600" : "bg-rose-100 text-rose-600",
+    icon: isCredit ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />,
+    tableIcon: isCredit ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />,
+  };
 }
 
 const paymentStatusColors: Record<"paid" | "open", BadgeTone> = {
@@ -195,7 +211,7 @@ export function TransactionTable({
 
           {!emptyState &&
             items.map((t) => {
-              const isExpense = t.kind === "expense";
+              const valueDisplay = getValueDisplay(t);
               const paymentStatus = paymentStatusColors[t.paid ? "paid" : "open"];
               const classificationBadge = getClassificationBadge(t);
               const installmentLabel = renderInstallmentLabel(t);
@@ -207,11 +223,11 @@ export function TransactionTable({
                       <div
                         className={[
                           "mt-0.5 rounded-full p-2",
-                          isExpense ? "bg-rose-100 text-rose-600" : "bg-emerald-100 text-emerald-600",
+                          valueDisplay.iconClassName,
                         ].join(" ")}
-                        title={isExpense ? "Despesa" : "Receita"}
+                        title={valueDisplay.title}
                       >
-                        {isExpense ? <ArrowDownRight className="h-4 w-4" /> : <ArrowUpRight className="h-4 w-4" />}
+                        {valueDisplay.icon}
                       </div>
 
                       <div className="min-w-0">
@@ -258,8 +274,8 @@ export function TransactionTable({
 
                   <div className="mt-4 flex items-center justify-between border-t border-neutral-100 pt-3">
                     <span className="text-sm text-neutral-500">{t.card?.name ?? "Sem cartão"}</span>
-                    <span className={["text-lg font-bold", isExpense ? "text-rose-600" : "text-emerald-600"].join(" ")}>
-                      {isExpense ? "-" : "+"} {formatBRL(t.value)}
+                    <span className={["text-lg font-bold", valueDisplay.toneClassName].join(" ")}>
+                      {valueDisplay.sign} {formatBRL(valueDisplay.amount)}
                     </span>
                   </div>
                 </div>
@@ -300,7 +316,7 @@ export function TransactionTable({
               )}
 
               {items.map((t) => {
-                const isExpense = t.kind === "expense";
+                const valueDisplay = getValueDisplay(t);
                 const paymentStatus = paymentStatusColors[t.paid ? "paid" : "open"];
                 const classificationBadge = getClassificationBadge(t);
                 const installmentLabel = renderInstallmentLabel(t);
@@ -314,11 +330,11 @@ export function TransactionTable({
                         <div
                           className={[
                             "rounded-full p-1.5",
-                            isExpense ? "bg-rose-100 text-rose-600" : "bg-emerald-100 text-emerald-600",
+                            valueDisplay.iconClassName,
                           ].join(" ")}
-                          title={isExpense ? "Despesa" : "Receita"}
+                          title={valueDisplay.title}
                         >
-                          {isExpense ? <ArrowDownRight className="h-3 w-3" /> : <ArrowUpRight className="h-3 w-3" />}
+                          {valueDisplay.tableIcon}
                         </div>
 
                         <div>
@@ -355,8 +371,8 @@ export function TransactionTable({
                     </TableCell>
 
                     <TableCell className="text-right">
-                      <span className={["font-bold", isExpense ? "text-rose-600" : "text-emerald-600"].join(" ")}>
-                        {isExpense ? "-" : "+"} {formatBRL(t.value)}
+                      <span className={["font-bold", valueDisplay.toneClassName].join(" ")}>
+                        {valueDisplay.sign} {formatBRL(valueDisplay.amount)}
                       </span>
                     </TableCell>
 

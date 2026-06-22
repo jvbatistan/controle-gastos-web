@@ -53,6 +53,7 @@ function buildFormState(initialTransaction?: Transaction | null) {
     kind: initialTransaction?.kind ?? ("expense" as const),
     description: initialTransaction?.description ?? "",
     value: toCurrencyInput(initialTransaction?.value),
+    refund: initialTransaction?.refund ?? false,
     date: initialTransaction?.date ?? new Date().toISOString().slice(0, 10),
     source: initialTransaction?.source ?? ("cash" as const),
     cardId: initialTransaction?.card?.id ? String(initialTransaction.card.id) : "none",
@@ -82,6 +83,7 @@ function TransactionCreateFormFields({
   const [kind, setKind] = useState<"expense" | "income">(initialState.kind);
   const [description, setDescription] = useState(initialState.description);
   const [value, setValue] = useState(initialState.value);
+  const [refund, setRefund] = useState(initialState.refund);
   const [date, setDate] = useState(initialState.date);
   const [source, setSource] = useState<"cash" | "card" | "bank">(initialState.source);
   const [cardId, setCardId] = useState(initialState.cardId);
@@ -144,14 +146,15 @@ function TransactionCreateFormFields({
     await onSubmit({
       description: normalizedDescription,
       value: normalizedValue,
+      refund: source === "card" ? refund : false,
       date,
       kind,
       source,
       paid,
       note: note.trim() || undefined,
       card_id: source === "card" && cardId !== "none" ? Number(cardId) : null,
-      installment_number: !isEditing && hasInstallments ? normalizedInstallmentNumber : null,
-      installments_count: !isEditing && hasInstallments ? normalizedInstallmentsCount : null,
+      installment_number: !isEditing && hasInstallments && !refund ? normalizedInstallmentNumber : null,
+      installments_count: !isEditing && hasInstallments && !refund ? normalizedInstallmentsCount : null,
     });
 
     if (!isEditing) {
@@ -159,6 +162,7 @@ function TransactionCreateFormFields({
       setKind(nextState.kind);
       setDescription(nextState.description);
       setValue(nextState.value);
+      setRefund(nextState.refund);
       setDate(nextState.date);
       setSource(nextState.source);
       setCardId(nextState.cardId);
@@ -253,7 +257,14 @@ function TransactionCreateFormFields({
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
             <FieldLabel>Origem</FieldLabel>
-            <Select value={source} onValueChange={(value) => setSource(value as "cash" | "card" | "bank")}>
+            <Select
+              value={source}
+              onValueChange={(value) => {
+                const nextSource = value as "cash" | "card" | "bank";
+                setSource(nextSource);
+                if (nextSource !== "card") setRefund(false);
+              }}
+            >
               <SelectTriggerHTML placeholder="Selecione a origem" options={sourceOptions} className="h-11 rounded-xl bg-white" />
             </Select>
           </div>
@@ -268,6 +279,22 @@ function TransactionCreateFormFields({
               />
             </Select>
           </div>
+
+          {source === "card" && (
+            <label className="inline-flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 md:col-span-2">
+              <input
+                type="checkbox"
+                checked={refund}
+                onChange={(e) => {
+                  setRefund(e.target.checked);
+                  if (e.target.checked) setHasInstallments(false);
+                }}
+                disabled={loading || isInstallmentTransaction}
+                className="h-4 w-4 rounded border-emerald-300"
+              />
+              Estorno / crédito no cartão
+            </label>
+          )}
 
           <label className="inline-flex items-center gap-3 rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-700">
             <input
@@ -293,16 +320,16 @@ function TransactionCreateFormFields({
             <label className="inline-flex items-center gap-3 rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-700">
               <input
                 type="checkbox"
-                checked={hasInstallments}
+                checked={hasInstallments && !refund}
                 onChange={(e) => setHasInstallments(e.target.checked)}
-                disabled={loading}
+                disabled={loading || refund}
                 className="h-4 w-4 rounded border-neutral-300"
               />
               Compra parcelada
             </label>
           </div>
 
-          {hasInstallments && (
+          {hasInstallments && !refund && (
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <FieldLabel>Parcela atual</FieldLabel>

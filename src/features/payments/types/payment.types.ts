@@ -11,15 +11,27 @@ export type PaymentStatement = {
   paid: boolean;
   paid_at?: string | null;
   ignored_at?: string | null;
+  payments?: CardStatementPayment[];
   due_day: number;
   closing_day: number;
   transactions_count: number;
+};
+
+export type CardStatementPayment = {
+  id: number;
+  amount: number;
+  paid_at: string;
+  description?: string | null;
+  source?: string | null;
+  original_transaction_id?: number | null;
 };
 
 export type LooseExpenseTransaction = {
   id: number;
   description: string;
   value: number;
+  signed_value?: number;
+  refund?: boolean;
   date: string;
   note?: string | null;
   installment_number?: number | null;

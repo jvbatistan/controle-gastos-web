@@ -22,6 +22,8 @@ export type Transaction = {
   id: number;
   description: string;
   value: number;
+  signed_value?: number;
+  refund?: boolean;
   date: string;
   kind: "income" | "expense";
   source?: "card" | "cash" | "bank";
@@ -46,6 +48,7 @@ export type TransactionFilters = {
 export type TransactionPayload = {
   description: string;
   value: number;
+  refund?: boolean;
   date: string;
   kind: "income" | "expense";
   source: "card" | "cash" | "bank";
