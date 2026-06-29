@@ -18,6 +18,7 @@ import {
   useTransactions,
   useDeleteTransaction,
   defaultTransactionFilters,
+  exportTransactionsCsv,
   type TransactionFiltersType as Filters,
 } from "@/features/transactions";
 import { useCards } from "@/features/cards";
@@ -31,6 +32,8 @@ export default function TransactionsPage() {
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
   const [classificationNotice, setClassificationNotice] = useState<string | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  const [exportingCsv, setExportingCsv] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   const clearFilters = () => setFilters(defaultTransactionFilters);
   const handleUnauthorized = useCallback(() => router.replace("/login"), [router]);
@@ -146,6 +149,36 @@ export default function TransactionsPage() {
     },
     [deleteTransaction, hasStatementFilters, refetch, refetchPayments]
   );
+  const handleExportCsv = useCallback(async () => {
+    setExportError(null);
+    setExportingCsv(true);
+
+    try {
+      const result = await exportTransactionsCsv(filters);
+
+      if (result.status === 401) {
+        handleUnauthorized();
+        return;
+      }
+
+      if (!result.data) {
+        throw new Error("Arquivo de exportação indisponível.");
+      }
+
+      const url = URL.createObjectURL(result.data.blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = result.data.filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      setExportError("Não foi possível exportar as transações. Tente novamente.");
+    } finally {
+      setExportingCsv(false);
+    }
+  }, [filters, handleUnauthorized]);
   const { cards, error: cardsError } = useCards({
     enabled: auth.status === "authenticated",
     onUnauthorized: handleUnauthorized,
@@ -182,10 +215,27 @@ export default function TransactionsPage() {
                 </p>
               </div>
 
-              <div className="text-sm text-neutral-500">
-                {loading ? "Carregando..." : `${items.length} itens`}
+              <div className="flex flex-col items-start gap-2 sm:items-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportCsv}
+                  disabled={exportingCsv || loading}
+                >
+                  {exportingCsv ? "Exportando..." : "Exportar CSV"}
+                </Button>
+                <div className="text-sm text-neutral-500">
+                  {loading ? "Carregando..." : `${items.length} itens`}
+                </div>
               </div>
             </div>
+
+            {exportError && (
+              <p className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                {exportError}
+              </p>
+            )}
 
             {summaryNotice && (
               <p className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-800">

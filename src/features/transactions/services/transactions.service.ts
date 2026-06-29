@@ -36,6 +36,46 @@ export async function fetchTransactions(filters: TransactionFilters, signal?: Ab
   }
 }
 
+function filenameFromContentDisposition(contentDisposition: string | null) {
+  if (!contentDisposition) return null;
+
+  const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8Match) return decodeURIComponent(utf8Match[1]);
+
+  const filenameMatch = contentDisposition.match(/filename="?([^";]+)"?/i);
+  return filenameMatch?.[1] ?? null;
+}
+
+export async function exportTransactionsCsv(filters: TransactionFilters) {
+  const query = buildTransactionsQuery(filters);
+
+  try {
+    const response = await fetch(`/api/transactions/export_csv${query}`, {
+      method: "GET",
+      cache: "no-store",
+      credentials: "include",
+    });
+
+    if (!response.ok) {
+      const message = response.status === 401 ? "HTTP 401" : "Não foi possível exportar as transações.";
+      throw new Error(message);
+    }
+
+    const blob = await response.blob();
+    const filename =
+      filenameFromContentDisposition(response.headers.get("content-disposition")) ??
+      `finch-transacoes-${new Date().toISOString().slice(0, 10)}.csv`;
+
+    return { status: 200 as const, data: { blob, filename } };
+  } catch (err) {
+    if (err instanceof Error && err.message.includes("401")) {
+      return { status: 401 as const, data: null as { blob: Blob; filename: string } | null };
+    }
+
+    throw err;
+  }
+}
+
 export async function createTransaction(payload: TransactionPayload) {
   try {
     const data = (await api("/api/transactions", {

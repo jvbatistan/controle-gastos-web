@@ -11,6 +11,7 @@ export { useDeleteTransaction } from "./hooks/useDeleteTransaction";
 export {
   buildTransactionsQuery,
   fetchTransactions,
+  exportTransactionsCsv,
   createTransaction,
   updateTransaction,
   deleteTransaction,

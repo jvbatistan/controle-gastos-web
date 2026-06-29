@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 const BACKEND_URL = process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL;
 const METHODS_WITH_BODY = new Set(["POST", "PUT", "PATCH", "DELETE"]);
-const RESPONSE_HEADERS = ["content-type", "cache-control", "etag", "last-modified"];
+const RESPONSE_HEADERS = ["content-type", "content-disposition", "cache-control", "etag", "last-modified"];
 
 function buildBackendUrl(path: string[], request: NextRequest) {
   const baseUrl = BACKEND_URL?.replace(/\/+$/, "");

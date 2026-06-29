@@ -8,6 +8,7 @@ const refetch = vi.fn();
 const createTransaction = vi.fn();
 const updateTransaction = vi.fn();
 const deleteTransaction = vi.fn();
+const exportTransactionsCsv = vi.fn();
 const useTransactions = vi.fn();
 const useCreateTransaction = vi.fn();
 const useUpdateTransaction = vi.fn();
@@ -46,12 +47,31 @@ vi.mock("@/features/transactions", async () => {
     useCreateTransaction: () => useCreateTransaction(),
     useUpdateTransaction: () => useUpdateTransaction(),
     useDeleteTransaction: () => useDeleteTransaction(),
+    exportTransactionsCsv: (...args: unknown[]) => exportTransactionsCsv(...args),
     TransactionStats: () => <div>Stats</div>,
-    TransactionFilters: () => <div>Filters</div>,
+    TransactionFilters: ({ onChange }: { onChange: (filters: unknown) => void }) => (
+      <button
+        type="button"
+        onClick={() => onChange({ cardId: "7", month: "3", year: "2026", limit: "100" })}
+      >
+        Filters
+      </button>
+    ),
   };
 });
 
 beforeEach(() => {
+  Object.defineProperty(URL, "createObjectURL", {
+    configurable: true,
+    writable: true,
+    value: vi.fn(() => "blob:finch-csv"),
+  });
+  Object.defineProperty(URL, "revokeObjectURL", {
+    configurable: true,
+    writable: true,
+    value: vi.fn(),
+  });
+
   push.mockReset();
   replace.mockReset();
   refetch.mockReset().mockResolvedValue(undefined);
@@ -61,6 +81,10 @@ beforeEach(() => {
     description: "SUPERMERCADO NOVO",
   });
   deleteTransaction.mockReset().mockResolvedValue(true);
+  exportTransactionsCsv.mockReset().mockResolvedValue({
+    status: 200,
+    data: { blob: new Blob(["csv"], { type: "text/csv" }), filename: "finch-transacoes-2026-06-29.csv" },
+  });
   useAuth.mockReturnValue({
     status: "authenticated",
     user: { id: 1, name: "Joao", email: "joao@example.com", active: true },
@@ -155,5 +179,68 @@ describe("TransactionsPage", () => {
       expect(deleteTransaction).toHaveBeenCalledWith(1);
       expect(refetch).toHaveBeenCalled();
     });
+  });
+
+  it("shows the CSV export button and downloads using the current filters", async () => {
+    const user = userEvent.setup();
+    const createObjectURL = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:finch-csv");
+    const revokeObjectURL = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+
+    render(<TransactionsPage />);
+
+    expect(screen.getByRole("button", { name: /Exportar CSV/i })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Filters" }));
+    await user.click(screen.getByRole("button", { name: /Exportar CSV/i }));
+
+    await waitFor(() => {
+      expect(exportTransactionsCsv).toHaveBeenCalledWith({
+        cardId: "7",
+        month: "3",
+        year: "2026",
+        limit: "100",
+      });
+      expect(createObjectURL).toHaveBeenCalled();
+      expect(click).toHaveBeenCalled();
+      expect(revokeObjectURL).toHaveBeenCalledWith("blob:finch-csv");
+    });
+  });
+
+  it("shows loading while exporting CSV", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+    let resolveExport: (value: unknown) => void = () => undefined;
+    exportTransactionsCsv.mockReturnValue(
+      new Promise((resolve) => {
+        resolveExport = resolve;
+      })
+    );
+
+    render(<TransactionsPage />);
+
+    await user.click(screen.getByRole("button", { name: /Exportar CSV/i }));
+
+    expect(screen.getByRole("button", { name: /Exportando/i })).toBeDisabled();
+
+    resolveExport({
+      status: 200,
+      data: { blob: new Blob(["csv"], { type: "text/csv" }), filename: "finch-transacoes-2026-06-29.csv" },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Exportar CSV/i })).not.toBeDisabled();
+    });
+  });
+
+  it("shows a friendly error if CSV export fails", async () => {
+    const user = userEvent.setup();
+    exportTransactionsCsv.mockRejectedValue(new Error("boom"));
+
+    render(<TransactionsPage />);
+
+    await user.click(screen.getByRole("button", { name: /Exportar CSV/i }));
+
+    expect(await screen.findByText(/Não foi possível exportar as transações/i)).toBeInTheDocument();
   });
 });
