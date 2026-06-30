@@ -243,4 +243,66 @@ describe("TransactionsPage", () => {
 
     expect(await screen.findByText(/Não foi possível exportar as transações/i)).toBeInTheDocument();
   });
+
+  it("creates an income from the transaction modal and shows a success message", async () => {
+    const user = userEvent.setup();
+    createTransaction.mockResolvedValue({
+      kind: "single",
+      transaction: {
+        id: 22,
+        description: "SALARIO MENSAL",
+        value: 3500,
+        date: "2026-06-30",
+        kind: "income",
+        source: "bank",
+        paid: true,
+        card: null,
+        category: null,
+        classification: { status: "unclassified", category: null, suggestion: null },
+      },
+    });
+
+    render(<TransactionsPage />);
+
+    await user.click(screen.getByText("Nova transacao"));
+    await user.click(screen.getByRole("button", { name: "Receita" }));
+    await user.type(screen.getByPlaceholderText("Ex: Salário mensal"), "Salario mensal");
+    await user.type(screen.getByPlaceholderText("0,00"), "350000");
+    fireEvent.change(screen.getByDisplayValue("Dinheiro"), { target: { value: "bank" } });
+    await user.click(screen.getByRole("button", { name: "Salvar receita" }));
+
+    await waitFor(() => {
+      expect(createTransaction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          description: "Salario mensal",
+          value: 3500,
+          kind: "income",
+          source: "bank",
+          paid: true,
+          refund: false,
+          card_id: null,
+          installment_number: null,
+          installments_count: null,
+        })
+      );
+      expect(refetch).toHaveBeenCalled();
+    });
+
+    expect(await screen.findByText("Receita cadastrada com sucesso.")).toBeInTheDocument();
+  });
+
+  it("shows the API error message when income creation fails", async () => {
+    const user = userEvent.setup();
+    useCreateTransaction.mockReturnValue({
+      createTransaction,
+      loading: false,
+      error: "Não foi possível cadastrar a receita.",
+    });
+
+    render(<TransactionsPage />);
+
+    await user.click(screen.getByText("Nova transacao"));
+
+    expect(screen.getByText("Não foi possível cadastrar a receita.")).toBeInTheDocument();
+  });
 });

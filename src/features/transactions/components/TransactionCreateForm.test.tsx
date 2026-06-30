@@ -60,6 +60,84 @@ describe("TransactionCreateForm", () => {
     });
   });
 
+  it("enables income mode, hides expense-only fields and submits a clean income payload", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <TransactionCreateForm
+        cards={[{ id: 7, name: "Nubank" }]}
+        onSubmit={onSubmit}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: "Receita" }));
+
+    expect(screen.getByText("Dados da receita")).toBeInTheDocument();
+    expect(screen.getByText("Recebimento")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Cartão")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Estorno / crédito no cartão")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Marcar como paga")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Compra parcelada")).not.toBeInTheDocument();
+    expect(screen.queryByText("Cartão")).not.toBeInTheDocument();
+
+    await user.type(screen.getByPlaceholderText("Ex: Salário mensal"), "Salario mensal");
+    await user.type(screen.getByPlaceholderText("0,00"), "350000");
+    fireEvent.change(screen.getByDisplayValue("Dinheiro"), { target: { value: "bank" } });
+    await user.click(screen.getByRole("button", { name: "Salvar receita" }));
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          description: "Salario mensal",
+          value: 3500,
+          kind: "income",
+          source: "bank",
+          paid: true,
+          refund: false,
+          card_id: null,
+          installment_number: null,
+          installments_count: null,
+        })
+      );
+    });
+  });
+
+  it("clears card, refund and installment state when switching from expense to income", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <TransactionCreateForm
+        cards={[{ id: 7, name: "Nubank" }]}
+        onSubmit={onSubmit}
+      />
+    );
+
+    await user.type(screen.getByPlaceholderText("Ex: Compra no supermercado"), "Renda extra");
+    await user.type(screen.getByPlaceholderText("0,00"), "10000");
+    fireEvent.change(screen.getByDisplayValue("Dinheiro"), { target: { value: "card" } });
+    fireEvent.change(screen.getByDisplayValue("Selecione um cartão"), { target: { value: "7" } });
+    await user.click(screen.getByLabelText("Estorno / crédito no cartão"));
+
+    await user.click(screen.getByRole("button", { name: "Receita" }));
+    await user.click(screen.getByRole("button", { name: "Salvar receita" }));
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          kind: "income",
+          source: "bank",
+          paid: true,
+          refund: false,
+          card_id: null,
+          installment_number: null,
+          installments_count: null,
+        })
+      );
+    });
+  });
+
   it("submits card refunds and disables installment fields for them", async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn().mockResolvedValue(undefined);

@@ -103,6 +103,8 @@ export default function TransactionsPage() {
           setClassificationNotice(
             `Parcelamento criado com ${created.transactions.length} parcelas. Revise a classificação se alguma parcela aparecer com sugestão pendente.`
           );
+        } else if (created.transaction.kind === "income") {
+          setClassificationNotice("Receita cadastrada com sucesso.");
         } else if (created.transaction.classification?.status === "suggestion_pending") {
           setClassificationNotice(
             `A transação "${created.transaction.description}" ficou com sugestão pendente para revisão.`
@@ -211,7 +213,7 @@ export default function TransactionsPage() {
               <div>
                 <h1 className="text-3xl font-bold">Transações</h1>
                 <p className="mt-1 text-neutral-500">
-                  Gerencie suas despesas (receitas em construção)
+                  Gerencie suas despesas e receitas simples
                 </p>
               </div>
 

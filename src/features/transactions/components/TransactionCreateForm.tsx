@@ -95,14 +95,18 @@ function TransactionCreateFormFields({
   const [error, setError] = useState<string | null>(null);
   const isEditing = mode === "edit";
   const isInstallmentTransaction = Boolean(initialTransaction?.installment_group_id);
+  const isIncome = kind === "income";
 
   const sourceOptions = useMemo(
-    () => [
-      { value: "cash", label: "Dinheiro" },
-      { value: "bank", label: "Banco" },
-      { value: "card", label: "Cartão" },
-    ],
-    []
+    () => {
+      const options = [
+        { value: "cash", label: "Dinheiro" },
+        { value: "bank", label: "Banco" },
+      ];
+
+      return isIncome ? options : [...options, { value: "card", label: "Cartão" }];
+    },
+    [isIncome]
   );
 
   const cardOptions = useMemo(
@@ -117,7 +121,8 @@ function TransactionCreateFormFields({
     const normalizedValue = parseCurrencyInput(value);
     const normalizedInstallmentNumber = Number(installmentNumber);
     const normalizedInstallmentsCount = Number(installmentsCount);
-    const requiresCard = source === "card";
+    const effectiveSource = isIncome && source === "card" ? "bank" : source;
+    const requiresCard = !isIncome && effectiveSource === "card";
 
     if (!normalizedDescription || !date || !(normalizedValue > 0)) {
       setError("Preencha descrição, valor e data corretamente.");
@@ -130,6 +135,7 @@ function TransactionCreateFormFields({
     }
 
     if (
+      !isIncome &&
       hasInstallments &&
       (!Number.isInteger(normalizedInstallmentNumber) ||
         !Number.isInteger(normalizedInstallmentsCount) ||
@@ -146,15 +152,15 @@ function TransactionCreateFormFields({
     await onSubmit({
       description: normalizedDescription,
       value: normalizedValue,
-      refund: source === "card" ? refund : false,
+      refund: !isIncome && effectiveSource === "card" ? refund : false,
       date,
       kind,
-      source,
-      paid,
+      source: isIncome ? effectiveSource === "cash" ? "cash" : "bank" : effectiveSource,
+      paid: isIncome ? true : paid,
       note: note.trim() || undefined,
-      card_id: source === "card" && cardId !== "none" ? Number(cardId) : null,
-      installment_number: !isEditing && hasInstallments && !refund ? normalizedInstallmentNumber : null,
-      installments_count: !isEditing && hasInstallments && !refund ? normalizedInstallmentsCount : null,
+      card_id: !isIncome && effectiveSource === "card" && cardId !== "none" ? Number(cardId) : null,
+      installment_number: !isIncome && !isEditing && hasInstallments && !refund ? normalizedInstallmentNumber : null,
+      installments_count: !isIncome && !isEditing && hasInstallments && !refund ? normalizedInstallmentsCount : null,
     });
 
     if (!isEditing) {
@@ -178,8 +184,12 @@ function TransactionCreateFormFields({
     <form onSubmit={handleSubmit} className="space-y-6">
       <section className="space-y-4 rounded-2xl border border-neutral-200 bg-neutral-50/70 p-4 sm:p-5">
         <div className="space-y-1">
-          <h3 className="text-base font-semibold text-neutral-900">Dados principais</h3>
-          <p className="text-sm text-neutral-500">Cadastre a transação e deixe a classificação automática fazer o resto.</p>
+          <h3 className="text-base font-semibold text-neutral-900">{isIncome ? "Dados da receita" : "Dados principais"}</h3>
+          <p className="text-sm text-neutral-500">
+            {isIncome
+              ? "Cadastre uma entrada financeira simples, sem cartão, fatura ou parcelamento."
+              : "Cadastre a transação e deixe a classificação automática fazer o resto."}
+          </p>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
@@ -198,15 +208,20 @@ function TransactionCreateFormFields({
               </button>
               <button
                 type="button"
-                onClick={() => setKind("income")}
+                onClick={() => {
+                  setKind("income");
+                  if (source === "card") setSource("bank");
+                  setCardId("none");
+                  setRefund(false);
+                  setPaid(true);
+                  setHasInstallments(false);
+                }}
                 className={[
                   "rounded-lg px-4 py-2 text-sm font-medium transition",
                   kind === "income" ? "bg-emerald-600 text-white shadow-sm" : "text-neutral-600 hover:bg-neutral-100",
                 ].join(" ")}
-                disabled={true}
               >
                 Receita
-                <small> (Em construção)</small>
               </button>
             </div>
           </div>
@@ -216,7 +231,7 @@ function TransactionCreateFormFields({
             <Input
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Ex: Compra no supermercado"
+              placeholder={isIncome ? "Ex: Salário mensal" : "Ex: Compra no supermercado"}
               disabled={loading}
               className="h-11 rounded-xl bg-white"
             />
@@ -250,8 +265,12 @@ function TransactionCreateFormFields({
 
       <section className="space-y-4 rounded-2xl border border-neutral-200 bg-white p-4 sm:p-5">
         <div className="space-y-1">
-          <h3 className="text-base font-semibold text-neutral-900">Pagamento</h3>
-          <p className="text-sm text-neutral-500">Escolha a origem da transação e informe o cartão apenas quando fizer sentido.</p>
+          <h3 className="text-base font-semibold text-neutral-900">{isIncome ? "Recebimento" : "Pagamento"}</h3>
+          <p className="text-sm text-neutral-500">
+            {isIncome
+              ? "Receitas simples entram como recebidas na data informada."
+              : "Escolha a origem da transação e informe o cartão apenas quando fizer sentido."}
+          </p>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
@@ -269,18 +288,20 @@ function TransactionCreateFormFields({
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <FieldLabel>Cartão</FieldLabel>
-            <Select value={cardId} onValueChange={setCardId}>
-              <SelectTriggerHTML
-                placeholder="Selecione um cartão"
-                options={cardOptions}
-                className={["h-11 rounded-xl bg-white", source !== "card" ? "opacity-60" : ""].join(" ")}
-              />
-            </Select>
-          </div>
+          {!isIncome && (
+            <div className="space-y-2">
+              <FieldLabel>Cartão</FieldLabel>
+              <Select value={cardId} onValueChange={setCardId}>
+                <SelectTriggerHTML
+                  placeholder="Selecione um cartão"
+                  options={cardOptions}
+                  className={["h-11 rounded-xl bg-white", source !== "card" ? "opacity-60" : ""].join(" ")}
+                />
+              </Select>
+            </div>
+          )}
 
-          {source === "card" && (
+          {!isIncome && source === "card" && (
             <label className="inline-flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 md:col-span-2">
               <input
                 type="checkbox"
@@ -296,20 +317,22 @@ function TransactionCreateFormFields({
             </label>
           )}
 
-          <label className="inline-flex items-center gap-3 rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-700">
-            <input
-              type="checkbox"
-              checked={paid}
-              onChange={(e) => setPaid(e.target.checked)}
-              disabled={loading}
-              className="h-4 w-4 rounded border-neutral-300"
-            />
-            Marcar como paga
-          </label>
+          {!isIncome && (
+            <label className="inline-flex items-center gap-3 rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-700">
+              <input
+                type="checkbox"
+                checked={paid}
+                onChange={(e) => setPaid(e.target.checked)}
+                disabled={loading}
+                className="h-4 w-4 rounded border-neutral-300"
+              />
+              Marcar como paga
+            </label>
+          )}
         </div>
       </section>
 
-      {!isEditing ? (
+      {!isIncome && !isEditing ? (
         <section className="space-y-4 rounded-2xl border border-neutral-200 bg-white p-4 sm:p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
