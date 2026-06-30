@@ -17,13 +17,6 @@ export async function fetchClassificationSuggestions(signal?: AbortSignal) {
   }
 }
 
-export async function acceptClassificationSuggestion(id: number) {
-  return api(`/api/classification_suggestions/${id}/accept`, {
-    method: "POST",
-    cache: "no-store",
-  }) as Promise<ClassificationSuggestion>;
-}
-
 export async function rejectClassificationSuggestion(id: number) {
   return api(`/api/classification_suggestions/${id}/reject`, {
     method: "POST",
@@ -31,11 +24,12 @@ export async function rejectClassificationSuggestion(id: number) {
   }) as Promise<ClassificationSuggestion>;
 }
 
-export async function correctClassificationSuggestion(id: number, categoryId: number) {
-  return api(`/api/classification_suggestions/${id}/correct`, {
+export async function applyClassificationSuggestion(id: number, categoryId: number, learn: boolean) {
+  return api(`/api/classification_suggestions/${id}/apply`, {
     method: "POST",
     body: JSON.stringify({
-      classification_suggestion: { category_id: categoryId },
+      category_id: categoryId,
+      learn,
     }),
     cache: "no-store",
   }) as Promise<ClassificationSuggestion>;

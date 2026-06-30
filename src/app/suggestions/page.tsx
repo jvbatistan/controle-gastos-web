@@ -11,8 +11,7 @@ import { Select, SelectTriggerHTML } from "@/components/ui/select";
 import { useAuth } from "@/lib/useAuth";
 import { useCategories } from "@/features/categories";
 import {
-  acceptClassificationSuggestion,
-  correctClassificationSuggestion,
+  applyClassificationSuggestion,
   rejectClassificationSuggestion,
   useClassificationSuggestions,
   type ClassificationSuggestion,
@@ -32,6 +31,10 @@ function installmentLabel(suggestion: ClassificationSuggestion) {
   return `${transaction.installment_number}/${transaction.installments_count}`;
 }
 
+function selectedCategoryIdFor(suggestion: ClassificationSuggestion, selectedBySuggestion: Record<number, string>) {
+  return selectedBySuggestion[suggestion.id] ?? (suggestion.suggested_category ? String(suggestion.suggested_category.id) : "");
+}
+
 function SuggestionsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -39,6 +42,7 @@ function SuggestionsPageContent() {
 
   const [message, setMessage] = useState<string | null>(null);
   const [submittingId, setSubmittingId] = useState<number | null>(null);
+  const [submittingAction, setSubmittingAction] = useState<"apply" | "learn" | "reject" | null>(null);
   const [selectedCategoryIdBySuggestion, setSelectedCategoryIdBySuggestion] = useState<Record<number, string>>({});
 
   const selectedSuggestionId = Number(searchParams.get("suggestion") || "0") || null;
@@ -78,9 +82,15 @@ function SuggestionsPageContent() {
   }, [selectedSuggestionId, suggestions]);
 
   const runAction = useCallback(
-    async (suggestionId: number, action: () => Promise<unknown>, successMessage: string) => {
+    async (
+      suggestionId: number,
+      actionKind: "apply" | "learn" | "reject",
+      action: () => Promise<unknown>,
+      successMessage: string
+    ) => {
       try {
         setSubmittingId(suggestionId);
+        setSubmittingAction(actionKind);
         setMessage(null);
         await action();
         setMessage(successMessage);
@@ -90,43 +100,38 @@ function SuggestionsPageContent() {
         setMessage(err instanceof Error ? err.message : "Não foi possível atualizar a sugestão.");
       } finally {
         setSubmittingId(null);
+        setSubmittingAction(null);
       }
     },
     [refetch]
-  );
-
-  const handleAccept = useCallback(
-    (suggestion: ClassificationSuggestion) =>
-      runAction(
-        suggestion.id,
-        () => acceptClassificationSuggestion(suggestion.id),
-        "Sugestão aplicada com sucesso."
-      ),
-    [runAction]
   );
 
   const handleReject = useCallback(
     (suggestion: ClassificationSuggestion) =>
       runAction(
         suggestion.id,
+        "reject",
         () => rejectClassificationSuggestion(suggestion.id),
         "Sugestão recusada."
       ),
     [runAction]
   );
 
-  const handleCorrect = useCallback(
-    (suggestion: ClassificationSuggestion) => {
-      const selectedCategoryId = Number(selectedCategoryIdBySuggestion[suggestion.id] || "0");
+  const handleApply = useCallback(
+    (suggestion: ClassificationSuggestion, learn: boolean) => {
+      const selectedCategoryId = Number(selectedCategoryIdFor(suggestion, selectedCategoryIdBySuggestion) || "0");
       if (!selectedCategoryId) {
-        setMessage("Escolha uma categoria antes de corrigir a sugestão.");
+        setMessage("Escolha uma categoria antes de aplicar a sugestão.");
         return Promise.resolve();
       }
 
       return runAction(
         suggestion.id,
-        () => correctClassificationSuggestion(suggestion.id, selectedCategoryId),
-        "Correção aplicada com sucesso."
+        learn ? "learn" : "apply",
+        () => applyClassificationSuggestion(suggestion.id, selectedCategoryId, learn),
+        learn
+          ? "Finch aprendeu esta categoria para próximas compras semelhantes."
+          : "Categoria aplicada somente nesta compra."
       );
     },
     [runAction, selectedCategoryIdBySuggestion]
@@ -174,6 +179,8 @@ function SuggestionsPageContent() {
                 const isSelected = selectedSuggestionId === suggestion.id;
                 const installment = installmentLabel(suggestion);
                 const isSubmitting = submittingId === suggestion.id;
+                const selectedCategoryId = selectedCategoryIdFor(suggestion, selectedCategoryIdBySuggestion);
+                const canApply = Boolean(selectedCategoryId);
 
                 return (
                   <Card key={suggestion.id} className={isSelected ? "border-sky-300 shadow-md" : undefined}>
@@ -205,26 +212,58 @@ function SuggestionsPageContent() {
                         </div>
 
                         <div className="rounded-2xl border border-neutral-200 bg-white p-4">
-                          <p className="text-sm font-medium text-neutral-800">Corrigir manualmente</p>
+                          <p className="text-sm font-medium text-neutral-800">Categoria a aplicar</p>
+                          <p className="mt-1 text-xs text-neutral-500">
+                            Use a sugestão ou escolha outra categoria antes de decidir se o Finch deve aprender.
+                          </p>
                           <div className="mt-3 space-y-3">
                             <Select
-                              value={selectedCategoryIdBySuggestion[suggestion.id] ?? ""}
+                              value={selectedCategoryId}
                               onValueChange={(value) =>
                                 setSelectedCategoryIdBySuggestion((current) => ({ ...current, [suggestion.id]: value }))
                               }
                             >
-                              <SelectTriggerHTML placeholder="Escolha a categoria correta" options={categoryOptions} />
+                              <SelectTriggerHTML placeholder="Escolha a categoria" options={categoryOptions} />
                             </Select>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              disabled={isSubmitting}
-                              onClick={() => void handleCorrect(suggestion)}
-                              className="w-full"
-                            >
-                              Corrigir categoria
-                            </Button>
                           </div>
+                        </div>
+                      </div>
+
+                      <div className="rounded-2xl border border-sky-100 bg-sky-50/60 p-4">
+                        <p className="text-sm font-medium text-sky-950">O que você quer fazer?</p>
+                        <p className="mt-1 text-sm text-sky-800">
+                          Aplique apenas nesta compra quando for uma exceção. Ensine o Finch quando próximas compras parecidas devem usar a mesma categoria.
+                        </p>
+                        <div className="mt-4 grid gap-3 md:grid-cols-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={isSubmitting || !canApply}
+                            onClick={() => void handleApply(suggestion, false)}
+                            className="h-auto justify-start border-sky-200 bg-white px-4 py-3 text-left text-sky-900 hover:bg-sky-50"
+                          >
+                            <Check className="mr-3 h-4 w-4 shrink-0" />
+                            <span>
+                              <span className="block font-medium">
+                                {isSubmitting && submittingAction === "apply" ? "Aplicando..." : "Aplicar só nesta compra"}
+                              </span>
+                              <span className="block text-xs font-normal text-sky-700">Não cria regra para o futuro.</span>
+                            </span>
+                          </Button>
+                          <Button
+                            type="button"
+                            disabled={isSubmitting || !canApply}
+                            onClick={() => void handleApply(suggestion, true)}
+                            className="h-auto justify-start bg-emerald-600 px-4 py-3 text-left text-white hover:bg-emerald-700"
+                          >
+                            <Sparkles className="mr-3 h-4 w-4 shrink-0" />
+                            <span>
+                              <span className="block font-medium">
+                                {isSubmitting && submittingAction === "learn" ? "Ensinando..." : "Ensinar o Finch"}
+                              </span>
+                              <span className="block text-xs font-normal text-emerald-50">Usa esta categoria em próximas compras semelhantes.</span>
+                            </span>
+                          </Button>
                         </div>
                       </div>
 
@@ -237,16 +276,7 @@ function SuggestionsPageContent() {
                           className="border-rose-200 text-rose-700 hover:bg-rose-50"
                         >
                           <X className="mr-2 h-4 w-4" />
-                          Rejeitar
-                        </Button>
-                        <Button
-                          type="button"
-                          disabled={isSubmitting || !suggestion.suggested_category}
-                          onClick={() => void handleAccept(suggestion)}
-                          className="bg-emerald-600 text-white hover:bg-emerald-700"
-                        >
-                          <Check className="mr-2 h-4 w-4" />
-                          Aceitar sugestão
+                          {isSubmitting && submittingAction === "reject" ? "Rejeitando..." : "Rejeitar sugestão"}
                         </Button>
                       </div>
                     </CardContent>

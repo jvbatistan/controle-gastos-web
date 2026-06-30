@@ -4,9 +4,8 @@ import SuggestionsPage from "@/app/suggestions/page";
 
 const push = vi.fn();
 const replace = vi.fn();
-const acceptClassificationSuggestion = vi.fn();
 const rejectClassificationSuggestion = vi.fn();
-const correctClassificationSuggestion = vi.fn();
+const applyClassificationSuggestion = vi.fn();
 const refetch = vi.fn();
 const useClassificationSuggestions = vi.fn();
 const useCategories = vi.fn();
@@ -36,9 +35,8 @@ vi.mock("@/features/categories", () => ({
 
 vi.mock("@/features/classification-suggestions", () => ({
   useClassificationSuggestions: () => useClassificationSuggestions(),
-  acceptClassificationSuggestion: (...args: unknown[]) => acceptClassificationSuggestion(...args),
   rejectClassificationSuggestion: (...args: unknown[]) => rejectClassificationSuggestion(...args),
-  correctClassificationSuggestion: (...args: unknown[]) => correctClassificationSuggestion(...args),
+  applyClassificationSuggestion: (...args: unknown[]) => applyClassificationSuggestion(...args),
 }));
 
 const suggestion = {
@@ -63,9 +61,8 @@ const suggestion = {
 beforeEach(() => {
   push.mockReset();
   replace.mockReset();
-  acceptClassificationSuggestion.mockReset().mockResolvedValue({});
   rejectClassificationSuggestion.mockReset().mockResolvedValue({});
-  correctClassificationSuggestion.mockReset().mockResolvedValue({});
+  applyClassificationSuggestion.mockReset().mockResolvedValue({});
   refetch.mockReset().mockResolvedValue(undefined);
   useAuth.mockReturnValue({ status: "authenticated" });
   useSearchParams.mockReturnValue({ get: (key: string) => (key === "suggestion" ? "10" : null) });
@@ -93,7 +90,7 @@ describe("SuggestionsPage", () => {
     expect(screen.getByText("Nenhuma sugestão pendente")).toBeInTheDocument();
   });
 
-  it("accepts a suggestion and refreshes the list", async () => {
+  it("applies only to this purchase with the suggested category and refreshes the list", async () => {
     const user = userEvent.setup();
 
     useClassificationSuggestions.mockReturnValue({
@@ -105,15 +102,16 @@ describe("SuggestionsPage", () => {
 
     render(<SuggestionsPage />);
 
-    await user.click(screen.getByRole("button", { name: /Aceitar sugestão/i }));
+    await user.click(screen.getByRole("button", { name: /Aplicar só nesta compra/i }));
 
     await waitFor(() => {
-      expect(acceptClassificationSuggestion).toHaveBeenCalledWith(10);
+      expect(applyClassificationSuggestion).toHaveBeenCalledWith(10, 1, false);
       expect(refetch).toHaveBeenCalled();
     });
+    expect(screen.getByText("Categoria aplicada somente nesta compra.")).toBeInTheDocument();
   });
 
-  it("corrects a suggestion with the selected category", async () => {
+  it("teaches Finch with the selected category and refreshes the list", async () => {
     const user = userEvent.setup();
 
     useClassificationSuggestions.mockReturnValue({
@@ -125,14 +123,84 @@ describe("SuggestionsPage", () => {
 
     render(<SuggestionsPage />);
 
-    fireEvent.change(screen.getByDisplayValue("Escolha a categoria correta"), {
+    fireEvent.change(screen.getByDisplayValue("Transporte"), {
       target: { value: "2" },
     });
 
-    await user.click(screen.getByRole("button", { name: /Corrigir categoria/i }));
+    await user.click(screen.getByRole("button", { name: /Ensinar o Finch/i }));
 
     await waitFor(() => {
-      expect(correctClassificationSuggestion).toHaveBeenCalledWith(10, 2);
+      expect(applyClassificationSuggestion).toHaveBeenCalledWith(10, 2, true);
+      expect(refetch).toHaveBeenCalled();
+    });
+    expect(screen.getByText("Finch aprendeu esta categoria para próximas compras semelhantes.")).toBeInTheDocument();
+  });
+
+  it("shows loading while teaching Finch", async () => {
+    const user = userEvent.setup();
+    let resolveApply: (value: unknown) => void = () => undefined;
+    applyClassificationSuggestion.mockReturnValue(
+      new Promise((resolve) => {
+        resolveApply = resolve;
+      })
+    );
+
+    useClassificationSuggestions.mockReturnValue({
+      suggestions: [suggestion],
+      loading: false,
+      error: null,
+      refetch,
+    });
+
+    render(<SuggestionsPage />);
+
+    await user.click(screen.getByRole("button", { name: /Ensinar o Finch/i }));
+
+    expect(screen.getByRole("button", { name: /Ensinando/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Aplicar só nesta compra/i })).toBeDisabled();
+
+    resolveApply({});
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Ensinar o Finch/i })).not.toBeDisabled();
+    });
+  });
+
+  it("shows the API error when applying fails", async () => {
+    const user = userEvent.setup();
+    applyClassificationSuggestion.mockRejectedValue(new Error("Categoria inválida"));
+
+    useClassificationSuggestions.mockReturnValue({
+      suggestions: [suggestion],
+      loading: false,
+      error: null,
+      refetch,
+    });
+
+    render(<SuggestionsPage />);
+
+    await user.click(screen.getByRole("button", { name: /Aplicar só nesta compra/i }));
+
+    expect(await screen.findByText("Categoria inválida")).toBeInTheDocument();
+    expect(refetch).not.toHaveBeenCalled();
+  });
+
+  it("keeps rejecting suggestions as a separate flow", async () => {
+    const user = userEvent.setup();
+
+    useClassificationSuggestions.mockReturnValue({
+      suggestions: [suggestion],
+      loading: false,
+      error: null,
+      refetch,
+    });
+
+    render(<SuggestionsPage />);
+
+    await user.click(screen.getByRole("button", { name: /Rejeitar sugestão/i }));
+
+    await waitFor(() => {
+      expect(rejectClassificationSuggestion).toHaveBeenCalledWith(10);
       expect(refetch).toHaveBeenCalled();
     });
   });
