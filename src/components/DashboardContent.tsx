@@ -5,11 +5,9 @@ import {
   ArrowDownRight,
   ArrowUpRight,
   Calendar,
-  CheckCircle2,
   FileText,
   Receipt,
   ShoppingBag,
-  Wrench,
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import type { DashboardOverview } from "@/features/dashboard";
@@ -475,21 +473,88 @@ function TransactionList({ overview }: Props) {
   );
 }
 
-function ComingSoonCard({ title, description }: { title: string; description: string }) {
+function CashFlowCard({ overview }: Props) {
+  const { summary, period } = overview;
+  const incomesTotal = Number(summary.incomes_total);
+  const expensesTotal = Number(summary.expenses_total);
+  const balanceTotal = Number(summary.balance_total);
+  const maxTotal = Math.max(incomesTotal, expensesTotal, 1);
+  const balanceIsPositive = balanceTotal >= 0;
+
   return (
-    <Card className="h-full rounded-lg border-dashed bg-neutral-50/60">
-      <CardContent className="flex h-full min-h-[220px] items-center justify-center p-6">
-        <div className="flex flex-col items-center justify-center space-y-2.5 text-center">
-          <div className="rounded-lg bg-amber-50 p-3">
-            <Wrench className="h-5 w-5 text-amber-500" />
+    <Card className="h-full rounded-lg transition-shadow hover:shadow-md">
+      <CardHeader>
+        <CardTitle>Receitas vs despesas</CardTitle>
+        <p className="mt-1 text-sm text-neutral-500">Entradas, saídas e saldo líquido em {period.label}.</p>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-5">
+          <div className="space-y-3">
+            <div>
+              <div className="mb-1.5 flex items-center justify-between gap-3">
+                <span className="text-sm font-medium text-neutral-600">Receitas</span>
+                <span className="font-bold text-emerald-600 tabular-nums">{formatBRL(incomesTotal)}</span>
+              </div>
+              <div className="h-2.5 overflow-hidden rounded-full bg-neutral-100">
+                <div className="h-full rounded-full bg-emerald-500" style={{ width: `${percent(incomesTotal, maxTotal)}%` }} />
+              </div>
+            </div>
+            <div>
+              <div className="mb-1.5 flex items-center justify-between gap-3">
+                <span className="text-sm font-medium text-neutral-600">Despesas</span>
+                <span className="font-bold text-rose-600 tabular-nums">{formatBRL(expensesTotal)}</span>
+              </div>
+              <div className="h-2.5 overflow-hidden rounded-full bg-neutral-100">
+                <div className="h-full rounded-full bg-rose-500" style={{ width: `${percent(expensesTotal, maxTotal)}%` }} />
+              </div>
+            </div>
           </div>
-          <div>
-            <h3 className="mb-1 text-sm font-semibold text-neutral-700">{title}</h3>
-            <p className="max-w-[250px] text-xs leading-relaxed text-neutral-500">{description}</p>
+          <div className={`rounded-lg border p-4 ${balanceIsPositive ? "border-emerald-100 bg-emerald-50" : "border-rose-100 bg-rose-50"}`}>
+            <p className={`text-xs font-semibold uppercase ${balanceIsPositive ? "text-emerald-700" : "text-rose-700"}`}>Saldo do mês</p>
+            <p className={`mt-1 text-2xl font-bold tabular-nums ${balanceIsPositive ? "text-emerald-700" : "text-rose-700"}`}>
+              {formatBRL(balanceTotal)}
+            </p>
+            <p className="mt-1 text-xs text-neutral-600">
+              {balanceIsPositive ? "Entrou mais dinheiro do que saiu no período." : "As despesas superaram as receitas do período."}
+            </p>
           </div>
-          <span className="inline-flex rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-700">
-            Em construção
-          </span>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function PaymentStatusCard({ overview }: Props) {
+  const { summary } = overview;
+  const openTotal = Number(summary.open_total);
+  const paidTotal = Number(summary.paid_total);
+  const total = Math.max(openTotal + paidTotal, 1);
+
+  return (
+    <Card className="h-full rounded-lg transition-shadow hover:shadow-md">
+      <CardHeader>
+        <CardTitle>Status das despesas</CardTitle>
+        <p className="mt-1 text-sm text-neutral-500">Quanto já foi quitado e quanto ainda está em aberto no mês.</p>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-lg bg-emerald-50 p-3">
+              <p className="text-xs text-emerald-700">Pagas</p>
+              <p className="mt-1 text-lg font-bold text-emerald-700 tabular-nums">{formatBRL(paidTotal)}</p>
+            </div>
+            <div className="rounded-lg bg-amber-50 p-3">
+              <p className="text-xs text-amber-700">Em aberto</p>
+              <p className="mt-1 text-lg font-bold text-amber-700 tabular-nums">{formatBRL(openTotal)}</p>
+            </div>
+          </div>
+          <div className="relative h-2.5 overflow-hidden rounded-full bg-neutral-100">
+            <div className="absolute h-full bg-emerald-500" style={{ width: `${percent(paidTotal, total)}%` }} />
+            <div className="absolute h-full bg-amber-500" style={{ left: `${percent(paidTotal, total)}%`, width: `${percent(openTotal, total)}%` }} />
+          </div>
+          <p className="text-xs text-neutral-500">
+            {summary.transactions_count} lançamento(s) financeiro(s) considerados no período.
+          </p>
         </div>
       </CardContent>
     </Card>
@@ -498,6 +563,8 @@ function ComingSoonCard({ title, description }: { title: string; description: st
 
 export function DashboardContent({ overview }: Props) {
   const { summary, period } = overview;
+  const balanceTotal = Number(summary.balance_total);
+  const balanceIsPositive = balanceTotal >= 0;
 
   return (
     <div className="space-y-6 lg:space-y-8">
@@ -505,24 +572,24 @@ export function DashboardContent({ overview }: Props) {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h1 className="text-3xl font-bold text-neutral-950">Dashboard</h1>
-            <p className="mt-1.5 text-neutral-500">Panorama real das despesas, faturas e lançamentos recentes.</p>
+            <p className="mt-1.5 text-neutral-500">Panorama real das receitas, despesas, faturas e lançamentos recentes.</p>
           </div>
           <QuickStats overview={overview} />
         </div>
       </header>
 
       <section aria-label="Indicadores principais" className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <StatCard title="Receitas do mês" value={formatBRL(Number(summary.incomes_total))} subtitle={`Entradas recebidas em ${period.label}`} icon={<ArrowDownRight className="h-6 w-6 text-white" />} iconClassName="bg-emerald-600" accentClassName="bg-emerald-500" />
         <StatCard title="Despesas do mês" value={formatBRL(Number(summary.expenses_total))} subtitle={`Total consolidado em ${period.label}`} icon={<Receipt className="h-6 w-6 text-white" />} iconClassName="bg-rose-600" accentClassName="bg-rose-500" />
-        <StatCard title="Em aberto" value={formatBRL(Number(summary.open_total))} subtitle="Ainda precisam de pagamento" icon={<AlertCircle className="h-6 w-6 text-white" />} iconClassName="bg-amber-600" accentClassName="bg-amber-500" />
-        <StatCard title="Pagas" value={formatBRL(Number(summary.paid_total))} subtitle="Já quitadas no período" icon={<CheckCircle2 className="h-6 w-6 text-white" />} iconClassName="bg-emerald-600" accentClassName="bg-emerald-500" />
-        <StatCard title="Transações do período" value={String(summary.transactions_count)} subtitle="Despesas consideradas no dashboard" icon={<FileText className="h-6 w-6 text-white" />} iconClassName="bg-blue-600" accentClassName="bg-blue-500" />
+        <StatCard title="Saldo do mês" value={formatBRL(balanceTotal)} subtitle="Receitas menos despesas" icon={balanceIsPositive ? <ArrowUpRight className="h-6 w-6 text-white" /> : <AlertCircle className="h-6 w-6 text-white" />} iconClassName={balanceIsPositive ? "bg-blue-600" : "bg-rose-600"} accentClassName={balanceIsPositive ? "bg-blue-500" : "bg-rose-500"} />
+        <StatCard title="Transações do período" value={String(summary.transactions_count)} subtitle="Receitas e despesas consideradas" icon={<FileText className="h-6 w-6 text-white" />} iconClassName="bg-indigo-600" accentClassName="bg-indigo-500" />
       </section>
 
       <section className="grid grid-cols-1 gap-5 lg:grid-cols-3 lg:gap-6" aria-label="Análise visual">
         <div className="lg:col-span-2">
           <MonthlyTrend overview={overview} />
         </div>
-        <ComingSoonCard title="Receitas vs despesas" description="Comparativo será ativado quando o módulo de receitas existir." />
+        <CashFlowCard overview={overview} />
       </section>
 
       <section className="grid grid-cols-1 gap-5 xl:grid-cols-2 xl:gap-6" aria-label="Distribuição financeira">
@@ -534,7 +601,7 @@ export function DashboardContent({ overview }: Props) {
         <div className="lg:col-span-2">
           <TransactionList overview={overview} />
         </div>
-        <ComingSoonCard title="Saldo e economia mensal" description="Saldo líquido, economia do mês e indicadores de entrada dependem do módulo de receitas." />
+        <PaymentStatusCard overview={overview} />
       </section>
     </div>
   );

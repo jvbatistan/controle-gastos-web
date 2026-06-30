@@ -1,5 +1,7 @@
 export type DashboardSummary = {
+  incomes_total: number;
   expenses_total: number;
+  balance_total: number;
   open_total: number;
   paid_total: number;
   transactions_count: number;
