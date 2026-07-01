@@ -31,6 +31,7 @@ export type Transaction = {
   note?: string | null;
   category?: TransactionCategory | null;
   card?: { id: number; name: string } | null;
+  account?: { id: number; name: string; kind?: string } | null;
   installment_group_id?: string | null;
   installment_number?: number | null;
   installments_count?: number | null;
@@ -57,6 +58,7 @@ export type TransactionPayload = {
   responsible?: string;
   category_id?: number | null;
   card_id?: number | null;
+  account_id?: number | null;
   billing_statement?: string | null;
   installment_number?: number | null;
   installments_count?: number | null;

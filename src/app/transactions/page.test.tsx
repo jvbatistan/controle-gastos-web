@@ -14,6 +14,7 @@ const useCreateTransaction = vi.fn();
 const useUpdateTransaction = vi.fn();
 const useDeleteTransaction = vi.fn();
 const useCards = vi.fn();
+const useAccounts = vi.fn();
 const useAuth = vi.fn();
 
 vi.mock("next/navigation", () => ({
@@ -36,6 +37,10 @@ vi.mock("@/components/Navigation", () => ({
 
 vi.mock("@/features/cards", () => ({
   useCards: () => useCards(),
+}));
+
+vi.mock("@/features/accounts", () => ({
+  useAccounts: () => useAccounts(),
 }));
 
 vi.mock("@/features/transactions", async () => {
@@ -91,6 +96,10 @@ beforeEach(() => {
   });
   useCards.mockReturnValue({
     cards: [{ id: 7, name: "NUBANK" }],
+    error: null,
+  });
+  useAccounts.mockReturnValue({
+    accounts: [{ id: 3, name: "Conta Corrente" }],
     error: null,
   });
   useTransactions.mockReturnValue({
@@ -256,6 +265,7 @@ describe("TransactionsPage", () => {
         kind: "income",
         source: "bank",
         paid: true,
+        account: { id: 3, name: "Conta Corrente" },
         card: null,
         category: null,
         classification: { status: "unclassified", category: null, suggestion: null },
@@ -269,6 +279,7 @@ describe("TransactionsPage", () => {
     await user.type(screen.getByPlaceholderText("Ex: Salário mensal"), "Salario mensal");
     await user.type(screen.getByPlaceholderText("0,00"), "350000");
     fireEvent.change(screen.getByDisplayValue("Dinheiro"), { target: { value: "bank" } });
+    fireEvent.change(screen.getByDisplayValue("Selecione a conta onde o dinheiro entrou"), { target: { value: "3" } });
     await user.click(screen.getByRole("button", { name: "Salvar receita" }));
 
     await waitFor(() => {
@@ -281,6 +292,7 @@ describe("TransactionsPage", () => {
           paid: true,
           refund: false,
           card_id: null,
+          account_id: 3,
           installment_number: null,
           installments_count: null,
         })

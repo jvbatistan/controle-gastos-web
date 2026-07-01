@@ -22,6 +22,7 @@ import {
   type TransactionFiltersType as Filters,
 } from "@/features/transactions";
 import { useCards } from "@/features/cards";
+import { useAccounts } from "@/features/accounts";
 import { usePayments } from "@/features/payments";
 
 export default function TransactionsPage() {
@@ -185,6 +186,10 @@ export default function TransactionsPage() {
     enabled: auth.status === "authenticated",
     onUnauthorized: handleUnauthorized,
   });
+  const { accounts, loading: accountsLoading, error: accountsError } = useAccounts({
+    enabled: auth.status === "authenticated",
+    onUnauthorized: handleUnauthorized,
+  });
 
   const summaryNotice = useMemo(() => {
     if (classificationNotice) return classificationNotice;
@@ -265,6 +270,11 @@ export default function TransactionsPage() {
                 {cardsError}
               </p>
             )}
+            {accountsError && (
+              <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+                {accountsError}
+              </p>
+            )}
             {deleteError && (
               <p className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
                 {deleteError}
@@ -316,6 +326,8 @@ export default function TransactionsPage() {
             <div className="max-h-[calc(100vh-12rem)] overflow-y-auto px-5 py-5 sm:px-6">
               <TransactionCreateForm
                 cards={cards}
+                accounts={accounts}
+                accountsLoading={accountsLoading}
                 mode={editingTransaction ? "edit" : "create"}
                 initialTransaction={editingTransaction}
                 loading={creating || updating}

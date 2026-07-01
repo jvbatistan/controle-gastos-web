@@ -25,6 +25,7 @@ describe("TransactionCreateForm", () => {
     render(
       <TransactionCreateForm
         cards={[{ id: 7, name: "Nubank" }]}
+        accounts={[{ id: 3, name: "Conta Corrente" }]}
         onSubmit={onSubmit}
       />
     );
@@ -67,6 +68,7 @@ describe("TransactionCreateForm", () => {
     render(
       <TransactionCreateForm
         cards={[{ id: 7, name: "Nubank" }]}
+        accounts={[{ id: 3, name: "Conta Corrente" }]}
         onSubmit={onSubmit}
       />
     );
@@ -80,10 +82,12 @@ describe("TransactionCreateForm", () => {
     expect(screen.queryByLabelText("Marcar como paga")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Compra parcelada")).not.toBeInTheDocument();
     expect(screen.queryByText("Cartão")).not.toBeInTheDocument();
+    expect(screen.getByText("Conta")).toBeInTheDocument();
 
     await user.type(screen.getByPlaceholderText("Ex: Salário mensal"), "Salario mensal");
     await user.type(screen.getByPlaceholderText("0,00"), "350000");
     fireEvent.change(screen.getByDisplayValue("Dinheiro"), { target: { value: "bank" } });
+    fireEvent.change(screen.getByDisplayValue("Selecione a conta onde o dinheiro entrou"), { target: { value: "3" } });
     await user.click(screen.getByRole("button", { name: "Salvar receita" }));
 
     await waitFor(() => {
@@ -96,6 +100,7 @@ describe("TransactionCreateForm", () => {
           paid: true,
           refund: false,
           card_id: null,
+          account_id: 3,
           installment_number: null,
           installments_count: null,
         })
@@ -110,6 +115,7 @@ describe("TransactionCreateForm", () => {
     render(
       <TransactionCreateForm
         cards={[{ id: 7, name: "Nubank" }]}
+        accounts={[{ id: 3, name: "Conta Corrente" }]}
         onSubmit={onSubmit}
       />
     );
@@ -121,6 +127,7 @@ describe("TransactionCreateForm", () => {
     await user.click(screen.getByLabelText("Estorno / crédito no cartão"));
 
     await user.click(screen.getByRole("button", { name: "Receita" }));
+    fireEvent.change(screen.getByDisplayValue("Selecione a conta onde o dinheiro entrou"), { target: { value: "3" } });
     await user.click(screen.getByRole("button", { name: "Salvar receita" }));
 
     await waitFor(() => {
@@ -131,6 +138,7 @@ describe("TransactionCreateForm", () => {
           paid: true,
           refund: false,
           card_id: null,
+          account_id: 3,
           installment_number: null,
           installments_count: null,
         })
@@ -173,6 +181,38 @@ describe("TransactionCreateForm", () => {
         })
       );
     });
+  });
+
+  it("blocks income submit without an account", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <TransactionCreateForm
+        cards={[]}
+        accounts={[{ id: 3, name: "Conta Corrente" }]}
+        onSubmit={onSubmit}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: "Receita" }));
+    await user.type(screen.getByPlaceholderText("Ex: Salário mensal"), "Salario mensal");
+    await user.type(screen.getByPlaceholderText("0,00"), "350000");
+    await user.click(screen.getByRole("button", { name: "Salvar receita" }));
+
+    expect(screen.getByText("Selecione a conta onde o dinheiro entrou.")).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("guides the user to create an account when income mode has no active accounts", async () => {
+    const user = userEvent.setup();
+
+    render(<TransactionCreateForm cards={[]} accounts={[]} onSubmit={vi.fn()} />);
+
+    await user.click(screen.getByRole("button", { name: "Receita" }));
+
+    expect(screen.getByText("Nenhuma conta cadastrada. Crie uma conta antes de lançar receitas.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Criar conta" })).toHaveAttribute("href", "/accounts");
   });
 
   it("loads initial values in edit mode and submits an update payload without installment fields", async () => {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectTriggerHTML } from "@/components/ui/select";
@@ -11,8 +12,15 @@ type CardOption = {
   name: string;
 };
 
+type AccountOption = {
+  id: number;
+  name: string;
+};
+
 type TransactionCreateFormProps = {
   cards: CardOption[];
+  accounts?: AccountOption[];
+  accountsLoading?: boolean;
   mode?: "create" | "edit";
   initialTransaction?: Transaction | null;
   loading?: boolean;
@@ -57,6 +65,7 @@ function buildFormState(initialTransaction?: Transaction | null) {
     date: initialTransaction?.date ?? new Date().toISOString().slice(0, 10),
     source: initialTransaction?.source ?? ("cash" as const),
     cardId: initialTransaction?.card?.id ? String(initialTransaction.card.id) : "none",
+    accountId: initialTransaction?.account?.id ? String(initialTransaction.account.id) : "none",
     paid: initialTransaction?.paid ?? false,
     note: initialTransaction?.note ?? "",
     hasInstallments: Boolean(initialTransaction?.installment_group_id),
@@ -73,6 +82,8 @@ export function TransactionCreateForm(props: TransactionCreateFormProps) {
 
 function TransactionCreateFormFields({
   cards,
+  accounts = [],
+  accountsLoading = false,
   mode = "create",
   initialTransaction = null,
   loading = false,
@@ -87,6 +98,7 @@ function TransactionCreateFormFields({
   const [date, setDate] = useState(initialState.date);
   const [source, setSource] = useState<"cash" | "card" | "bank">(initialState.source);
   const [cardId, setCardId] = useState(initialState.cardId);
+  const [accountId, setAccountId] = useState(initialState.accountId);
   const [paid, setPaid] = useState(initialState.paid);
   const [hasInstallments, setHasInstallments] = useState(initialState.hasInstallments);
   const [installmentNumber, setInstallmentNumber] = useState(initialState.installmentNumber);
@@ -96,6 +108,7 @@ function TransactionCreateFormFields({
   const isEditing = mode === "edit";
   const isInstallmentTransaction = Boolean(initialTransaction?.installment_group_id);
   const isIncome = kind === "income";
+  const hasAccounts = accounts.length > 0;
 
   const sourceOptions = useMemo(
     () => {
@@ -112,6 +125,13 @@ function TransactionCreateFormFields({
   const cardOptions = useMemo(
     () => [{ value: "none", label: "Selecione um cartão" }, ...cards.map((card) => ({ value: String(card.id), label: card.name }))],
     [cards]
+  );
+  const accountOptions = useMemo(
+    () => [
+      { value: "none", label: "Selecione a conta onde o dinheiro entrou" },
+      ...accounts.map((account) => ({ value: String(account.id), label: account.name })),
+    ],
+    [accounts]
   );
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -131,6 +151,11 @@ function TransactionCreateFormFields({
 
     if (requiresCard && cardId === "none") {
       setError("Selecione um cartão para transações no cartão.");
+      return;
+    }
+
+    if (isIncome && accountId === "none") {
+      setError("Selecione a conta onde o dinheiro entrou.");
       return;
     }
 
@@ -159,6 +184,7 @@ function TransactionCreateFormFields({
       paid: isIncome ? true : paid,
       note: note.trim() || undefined,
       card_id: !isIncome && effectiveSource === "card" && cardId !== "none" ? Number(cardId) : null,
+      account_id: isIncome && accountId !== "none" ? Number(accountId) : null,
       installment_number: !isIncome && !isEditing && hasInstallments && !refund ? normalizedInstallmentNumber : null,
       installments_count: !isIncome && !isEditing && hasInstallments && !refund ? normalizedInstallmentsCount : null,
     });
@@ -172,6 +198,7 @@ function TransactionCreateFormFields({
       setDate(nextState.date);
       setSource(nextState.source);
       setCardId(nextState.cardId);
+      setAccountId(nextState.accountId);
       setPaid(nextState.paid);
       setHasInstallments(nextState.hasInstallments);
       setInstallmentNumber(nextState.installmentNumber);
@@ -212,6 +239,7 @@ function TransactionCreateFormFields({
                   setKind("income");
                   if (source === "card") setSource("bank");
                   setCardId("none");
+                  setAccountId("none");
                   setRefund(false);
                   setPaid(true);
                   setHasInstallments(false);
@@ -298,6 +326,32 @@ function TransactionCreateFormFields({
                   className={["h-11 rounded-xl bg-white", source !== "card" ? "opacity-60" : ""].join(" ")}
                 />
               </Select>
+            </div>
+          )}
+
+          {isIncome && (
+            <div className="space-y-2">
+              <FieldLabel>Conta</FieldLabel>
+              {hasAccounts ? (
+                <Select value={accountId} onValueChange={setAccountId}>
+                  <SelectTriggerHTML
+                    placeholder="Selecione a conta onde o dinheiro entrou"
+                    options={accountOptions}
+                    className="h-11 rounded-xl bg-white"
+                  />
+                </Select>
+              ) : accountsLoading ? (
+                <div className="rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
+                  Carregando contas...
+                </div>
+              ) : (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                  <p>Nenhuma conta cadastrada. Crie uma conta antes de lançar receitas.</p>
+                  <Link href="/accounts" className="mt-2 inline-flex font-medium text-amber-900 underline underline-offset-4">
+                    Criar conta
+                  </Link>
+                </div>
+              )}
             </div>
           )}
 
