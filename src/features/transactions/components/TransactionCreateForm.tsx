@@ -108,6 +108,7 @@ function TransactionCreateFormFields({
   const isEditing = mode === "edit";
   const isInstallmentTransaction = Boolean(initialTransaction?.installment_group_id);
   const isIncome = kind === "income";
+  const showsAccountField = isIncome || source !== "card";
   const hasAccounts = accounts.length > 0;
 
   const sourceOptions = useMemo(
@@ -128,10 +129,10 @@ function TransactionCreateFormFields({
   );
   const accountOptions = useMemo(
     () => [
-      { value: "none", label: "Selecione a conta onde o dinheiro entrou" },
+      { value: "none", label: isIncome ? "Selecione a conta onde o dinheiro entrou" : "Selecione a conta de onde o dinheiro saiu" },
       ...accounts.map((account) => ({ value: String(account.id), label: account.name })),
     ],
-    [accounts]
+    [accounts, isIncome]
   );
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -143,6 +144,7 @@ function TransactionCreateFormFields({
     const normalizedInstallmentsCount = Number(installmentsCount);
     const effectiveSource = isIncome && source === "card" ? "bank" : source;
     const requiresCard = !isIncome && effectiveSource === "card";
+    const requiresAccount = isIncome || (!isIncome && effectiveSource !== "card");
 
     if (!normalizedDescription || !date || !(normalizedValue > 0)) {
       setError("Preencha descrição, valor e data corretamente.");
@@ -154,8 +156,8 @@ function TransactionCreateFormFields({
       return;
     }
 
-    if (isIncome && accountId === "none") {
-      setError("Selecione a conta onde o dinheiro entrou.");
+    if (requiresAccount && accountId === "none") {
+      setError(isIncome ? "Selecione a conta onde o dinheiro entrou." : "Selecione a conta de onde o dinheiro saiu.");
       return;
     }
 
@@ -184,7 +186,7 @@ function TransactionCreateFormFields({
       paid: isIncome ? true : paid,
       note: note.trim() || undefined,
       card_id: !isIncome && effectiveSource === "card" && cardId !== "none" ? Number(cardId) : null,
-      account_id: isIncome && accountId !== "none" ? Number(accountId) : null,
+      account_id: requiresAccount && accountId !== "none" ? Number(accountId) : null,
       installment_number: !isIncome && !isEditing && hasInstallments && !refund ? normalizedInstallmentNumber : null,
       installments_count: !isIncome && !isEditing && hasInstallments && !refund ? normalizedInstallmentsCount : null,
     });
@@ -310,6 +312,7 @@ function TransactionCreateFormFields({
                 const nextSource = value as "cash" | "card" | "bank";
                 setSource(nextSource);
                 if (nextSource !== "card") setRefund(false);
+                if (nextSource === "card") setAccountId("none");
               }}
             >
               <SelectTriggerHTML placeholder="Selecione a origem" options={sourceOptions} className="h-11 rounded-xl bg-white" />
@@ -329,13 +332,13 @@ function TransactionCreateFormFields({
             </div>
           )}
 
-          {isIncome && (
+          {showsAccountField && (
             <div className="space-y-2">
               <FieldLabel>Conta</FieldLabel>
               {hasAccounts ? (
                 <Select value={accountId} onValueChange={setAccountId}>
                   <SelectTriggerHTML
-                    placeholder="Selecione a conta onde o dinheiro entrou"
+                    placeholder={isIncome ? "Selecione a conta onde o dinheiro entrou" : "Selecione a conta de onde o dinheiro saiu"}
                     options={accountOptions}
                     className="h-11 rounded-xl bg-white"
                   />
@@ -346,7 +349,11 @@ function TransactionCreateFormFields({
                 </div>
               ) : (
                 <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                  <p>Nenhuma conta cadastrada. Crie uma conta antes de lançar receitas.</p>
+                  <p>
+                    {isIncome
+                      ? "Nenhuma conta cadastrada. Crie uma conta antes de lançar receitas."
+                      : "Nenhuma conta cadastrada. Crie uma conta antes de lançar despesas sem cartão."}
+                  </p>
                   <Link href="/accounts" className="mt-2 inline-flex font-medium text-amber-900 underline underline-offset-4">
                     Criar conta
                   </Link>

@@ -253,6 +253,49 @@ describe("TransactionsPage", () => {
     expect(await screen.findByText(/Não foi possível exportar as transações/i)).toBeInTheDocument();
   });
 
+  it("creates a cash or bank expense from the transaction modal with account_id", async () => {
+    const user = userEvent.setup();
+    createTransaction.mockResolvedValue({
+      kind: "single",
+      transaction: {
+        id: 23,
+        description: "PIX MERCADO",
+        value: 150,
+        date: "2026-06-30",
+        kind: "expense",
+        source: "bank",
+        paid: false,
+        account: { id: 3, name: "Conta Corrente" },
+        card: null,
+        category: null,
+        classification: { status: "unclassified", category: null, suggestion: null },
+      },
+    });
+
+    render(<TransactionsPage />);
+
+    await user.click(screen.getByText("Nova transacao"));
+    await user.type(screen.getByPlaceholderText("Ex: Compra no supermercado"), "Pix mercado");
+    await user.type(screen.getByPlaceholderText("0,00"), "15000");
+    fireEvent.change(screen.getByDisplayValue("Dinheiro"), { target: { value: "bank" } });
+    fireEvent.change(screen.getByDisplayValue("Selecione a conta de onde o dinheiro saiu"), { target: { value: "3" } });
+    await user.click(screen.getByRole("button", { name: "Salvar despesa" }));
+
+    await waitFor(() => {
+      expect(createTransaction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          description: "Pix mercado",
+          value: 150,
+          kind: "expense",
+          source: "bank",
+          card_id: null,
+          account_id: 3,
+        })
+      );
+      expect(refetch).toHaveBeenCalled();
+    });
+  });
+
   it("creates an income from the transaction modal and shows a success message", async () => {
     const user = userEvent.setup();
     createTransaction.mockResolvedValue({

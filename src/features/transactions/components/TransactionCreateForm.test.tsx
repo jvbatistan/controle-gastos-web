@@ -38,6 +38,7 @@ describe("TransactionCreateForm", () => {
 
     fireEvent.change(screen.getByDisplayValue("Dinheiro"), { target: { value: "card" } });
     fireEvent.change(screen.getByDisplayValue("Selecione um cartão"), { target: { value: "7" } });
+    expect(screen.queryByDisplayValue("Selecione a conta de onde o dinheiro saiu")).not.toBeInTheDocument();
 
     await user.click(screen.getByLabelText("Compra parcelada"));
     await user.clear(screen.getByPlaceholderText("1"));
@@ -54,8 +55,103 @@ describe("TransactionCreateForm", () => {
           value: 12.34,
           source: "card",
           card_id: 7,
+          account_id: null,
           installment_number: 2,
           installments_count: 6,
+        })
+      );
+    });
+  });
+
+  it("shows account for cash and bank expenses and submits account_id", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <TransactionCreateForm
+        cards={[{ id: 7, name: "Nubank" }]}
+        accounts={[{ id: 3, name: "Conta Corrente" }]}
+        onSubmit={onSubmit}
+      />
+    );
+
+    expect(screen.getByText("Conta")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Selecione a conta de onde o dinheiro saiu")).toBeInTheDocument();
+
+    await user.type(screen.getByPlaceholderText("Ex: Compra no supermercado"), "Pix mercado");
+    await user.type(screen.getByPlaceholderText("0,00"), "15000");
+    fireEvent.change(screen.getByDisplayValue("Dinheiro"), { target: { value: "bank" } });
+    fireEvent.change(screen.getByDisplayValue("Selecione a conta de onde o dinheiro saiu"), { target: { value: "3" } });
+    await user.click(screen.getByRole("button", { name: "Salvar despesa" }));
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          description: "Pix mercado",
+          value: 150,
+          kind: "expense",
+          source: "bank",
+          card_id: null,
+          account_id: 3,
+        })
+      );
+    });
+  });
+
+  it("blocks cash or bank expense submit without an account", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <TransactionCreateForm
+        cards={[]}
+        accounts={[{ id: 3, name: "Conta Corrente" }]}
+        onSubmit={onSubmit}
+      />
+    );
+
+    await user.type(screen.getByPlaceholderText("Ex: Compra no supermercado"), "Mercado");
+    await user.type(screen.getByPlaceholderText("0,00"), "1000");
+    await user.click(screen.getByRole("button", { name: "Salvar despesa" }));
+
+    expect(screen.getByText("Selecione a conta de onde o dinheiro saiu.")).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("guides the user to create an account for expenses without card when there are no active accounts", () => {
+    render(<TransactionCreateForm cards={[]} accounts={[]} onSubmit={vi.fn()} />);
+
+    expect(screen.getByText("Nenhuma conta cadastrada. Crie uma conta antes de lançar despesas sem cartão.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Criar conta" })).toHaveAttribute("href", "/accounts");
+  });
+
+  it("hides and clears account when switching an expense to card", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <TransactionCreateForm
+        cards={[{ id: 7, name: "Nubank" }]}
+        accounts={[{ id: 3, name: "Conta Corrente" }]}
+        onSubmit={onSubmit}
+      />
+    );
+
+    await user.type(screen.getByPlaceholderText("Ex: Compra no supermercado"), "Compra cartão");
+    await user.type(screen.getByPlaceholderText("0,00"), "1000");
+    fireEvent.change(screen.getByDisplayValue("Selecione a conta de onde o dinheiro saiu"), { target: { value: "3" } });
+    fireEvent.change(screen.getByDisplayValue("Dinheiro"), { target: { value: "card" } });
+    fireEvent.change(screen.getByDisplayValue("Selecione um cartão"), { target: { value: "7" } });
+
+    expect(screen.queryByDisplayValue("Conta Corrente")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Salvar despesa" }));
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          source: "card",
+          card_id: 7,
+          account_id: null,
         })
       );
     });
