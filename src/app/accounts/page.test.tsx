@@ -20,7 +20,7 @@ const activeAccounts = [
     kind: "checking" as const,
     initial_balance: "2000.0",
     initial_balance_date: "2026-07-01",
-    current_balance: "2000.0",
+    current_balance: "2250.0",
     archived_at: null,
     created_at: "2026-07-01T10:00:00Z",
     updated_at: "2026-07-01T10:00:00Z",
@@ -31,7 +31,18 @@ const activeAccounts = [
     kind: "wallet" as const,
     initial_balance: "100.0",
     initial_balance_date: "2026-07-01",
-    current_balance: "100.0",
+    current_balance: "-20.0",
+    archived_at: null,
+    created_at: "2026-07-01T10:00:00Z",
+    updated_at: "2026-07-01T10:00:00Z",
+  },
+  {
+    id: 4,
+    name: "Inter",
+    kind: "savings" as const,
+    initial_balance: "0.0",
+    initial_balance_date: "2026-07-10",
+    current_balance: "0.0",
     archived_at: null,
     created_at: "2026-07-01T10:00:00Z",
     updated_at: "2026-07-01T10:00:00Z",
@@ -45,7 +56,7 @@ const archivedAccounts = [
     kind: "digital_wallet" as const,
     initial_balance: "50.0",
     initial_balance_date: "2026-06-01",
-    current_balance: "50.0",
+    current_balance: "65.0",
     archived_at: "2026-07-01T10:00:00Z",
     created_at: "2026-06-01T10:00:00Z",
     updated_at: "2026-07-01T10:00:00Z",
@@ -113,7 +124,14 @@ describe("AccountsPage", () => {
     expect(screen.getByText("Gerencie onde seu dinheiro está.")).toBeInTheDocument();
     expect(screen.getByText("Nubank")).toBeInTheDocument();
     expect(screen.getAllByText("Carteira").length).toBeGreaterThan(0);
+    expect(screen.getByText("Inter")).toBeInTheDocument();
     expect(screen.getByText("PicPay")).toBeInTheDocument();
+    expect(screen.getByText("Patrimônio disponível")).toBeInTheDocument();
+    expect(screen.getByText("Soma dos saldos atuais das contas ativas")).toBeInTheDocument();
+    expect(screen.getByText("R$ 2.230,00")).toBeInTheDocument();
+    expect(screen.getByText("-R$ 20,00")).toBeInTheDocument();
+    expect(screen.getAllByText("R$ 0,00").length).toBeGreaterThan(0);
+    expect(screen.getByText("R$ 65,00")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /Nova conta/i }));
 

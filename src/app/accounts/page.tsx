@@ -81,8 +81,8 @@ export default function AccountsPage() {
     archived: true,
   });
 
-  const totalInitialBalance = useMemo(
-    () => activeAccounts.accounts.reduce((sum, account) => sum + Number(account.initial_balance), 0),
+  const availablePatrimony = useMemo(
+    () => activeAccounts.accounts.reduce((sum, account) => sum + Number(account.current_balance), 0),
     [activeAccounts.accounts]
   );
   const walletAccountsCount = useMemo(
@@ -241,11 +241,11 @@ export default function AccountsPage() {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-neutral-500">Saldo inicial total</CardTitle>
+            <CardTitle className="text-sm font-medium text-neutral-500">Patrimônio disponível</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-emerald-600 sm:text-3xl">{formatBRL(totalInitialBalance)}</div>
-            <p className="mt-1 text-xs text-neutral-500">Ainda não inclui transações nesta fase</p>
+            <div className={`text-2xl font-bold sm:text-3xl ${balanceTextClass(availablePatrimony)}`}>{formatBRL(availablePatrimony)}</div>
+            <p className="mt-1 text-xs text-neutral-500">Soma dos saldos atuais das contas ativas</p>
           </CardContent>
         </Card>
 
@@ -263,7 +263,7 @@ export default function AccountsPage() {
       <Card>
         <CardHeader>
           <CardTitle>Contas ativas</CardTitle>
-          <p className="mt-1 text-sm text-neutral-500">Accounts ainda não estão vinculadas a transações nesta fase.</p>
+          <p className="mt-1 text-sm text-neutral-500">Saldo patrimonial calculado por receitas, despesas sem cartão e pagamentos de fatura vinculados.</p>
         </CardHeader>
         <CardContent>
           {activeAccounts.loading ? (
@@ -409,6 +409,8 @@ function AccountCard({
   onArchive?: (account: Account) => void;
   onRestore?: (account: Account) => void;
 }) {
+  const currentBalance = Number(account.current_balance);
+
   return (
     <div className="rounded-2xl border border-neutral-200 p-4 transition hover:bg-neutral-50">
       <div className="mb-4 flex items-start justify-between gap-3">
@@ -426,7 +428,12 @@ function AccountCard({
         </span>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 rounded-xl bg-neutral-50 p-3">
+      <div className="mb-3 rounded-xl bg-neutral-50 p-3">
+        <p className="text-xs text-neutral-500">Saldo atual</p>
+        <p className={`mt-1 text-2xl font-bold tabular-nums ${balanceTextClass(currentBalance)}`}>{formatBRL(account.current_balance)}</p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 rounded-xl border border-neutral-100 p-3">
         <div>
           <p className="text-xs text-neutral-500">Saldo inicial</p>
           <p className="mt-1 font-bold text-neutral-950 tabular-nums">{formatBRL(account.initial_balance)}</p>
@@ -459,4 +466,11 @@ function AccountCard({
       </div>
     </div>
   );
+}
+
+function balanceTextClass(value: number) {
+  if (value > 0) return "text-emerald-600";
+  if (value < 0) return "text-rose-600";
+
+  return "text-neutral-700";
 }
