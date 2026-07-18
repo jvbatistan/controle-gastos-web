@@ -24,6 +24,10 @@ export type CardStatementPayment = {
   description?: string | null;
   source?: string | null;
   original_transaction_id?: number | null;
+  account?: {
+    id: number;
+    name: string;
+  } | null;
 };
 
 export type LooseExpenseTransaction = {

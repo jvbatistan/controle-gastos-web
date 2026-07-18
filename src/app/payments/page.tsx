@@ -10,12 +10,14 @@ import {
   DollarSign,
   X,
 } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AppLayout } from "@/components/AppLayout";
 import { CardBrandMark } from "@/components/CardBrandMark";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectTriggerHTML } from "@/components/ui/select";
+import { useAccounts } from "@/features/accounts";
 import { ignoreCardStatement, ignoreLooseExpense, payCardStatement, payLooseExpense, payLooseExpenses, usePayments } from "@/features/payments";
 import { getCardBrandPresentation } from "@/lib/cardBrand";
 import { useAuth } from "@/lib/useAuth";
@@ -85,6 +87,7 @@ export default function PaymentsPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [submittingKey, setSubmittingKey] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<PaymentConfirmation | null>(null);
+  const [statementAccountId, setStatementAccountId] = useState("none");
 
   const handleUnauthorized = useCallback(() => router.replace("/login"), [router]);
 
@@ -95,6 +98,10 @@ export default function PaymentsPage() {
   const { overview, loading, error, refetch } = usePayments({
     month: Number(month),
     year: Number(year),
+    enabled: auth.status === "authenticated",
+    onUnauthorized: handleUnauthorized,
+  });
+  const { accounts, loading: accountsLoading, error: accountsError } = useAccounts({
     enabled: auth.status === "authenticated",
     onUnauthorized: handleUnauthorized,
   });
@@ -123,12 +130,20 @@ export default function PaymentsPage() {
     submittingKey === "loose-expenses" ||
     submittingKey?.startsWith("loose-expense-") === true ||
     submittingKey?.startsWith("ignore-loose-expense-") === true;
+  const accountOptions = useMemo(
+    () => [
+      { value: "none", label: "Selecione a conta de onde saiu o dinheiro" },
+      ...accounts.map((account) => ({ value: String(account.id), label: account.name })),
+    ],
+    [accounts]
+  );
+  const hasAccounts = accounts.length > 0;
 
-  async function submitPayStatement(statementId: number) {
+  async function submitPayStatement(statementId: number, accountId: number) {
     try {
       setSubmittingKey(`statement-${statementId}`);
       setMessage(null);
-      const result = await payCardStatement(statementId);
+      const result = await payCardStatement(statementId, { accountId });
       if (result.status === 401) {
         handleUnauthorized();
         return;
@@ -218,10 +233,17 @@ export default function PaymentsPage() {
     if (!confirmation) return;
 
     const current = confirmation;
+
+    if (current.kind === "statement" && statementAccountId === "none") {
+      setMessage("Selecione a conta de onde saiu o pagamento da fatura.");
+      return;
+    }
+
     setConfirmation(null);
 
     if (current.kind === "statement") {
-      await submitPayStatement(current.statementId);
+      await submitPayStatement(current.statementId, Number(statementAccountId));
+      setStatementAccountId("none");
       return;
     }
 
@@ -274,6 +296,10 @@ export default function PaymentsPage() {
 
             {error && (
               <p className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p>
+            )}
+
+            {accountsError && (
+              <p className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{accountsError}</p>
             )}
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-4 md:gap-6">
@@ -453,12 +479,16 @@ export default function PaymentsPage() {
                               ) : (
                                 <div className="flex w-full flex-col gap-2 sm:w-auto">
                                   <Button
-                                    onClick={() => setConfirmation({
-                                      kind: "statement",
-                                      statementId: statement.id,
-                                      cardName: statement.card.name,
-                                      amount: Number(statement.remaining_amount),
-                                    })}
+                                    onClick={() => {
+                                      setStatementAccountId("none");
+                                      setMessage(null);
+                                      setConfirmation({
+                                        kind: "statement",
+                                        statementId: statement.id,
+                                        cardName: statement.card.name,
+                                        amount: Number(statement.remaining_amount),
+                                      });
+                                    }}
                                     disabled={isSubmitting || isIgnoring}
                                     className="w-full bg-neutral-900 text-white hover:bg-neutral-800 sm:w-auto"
                                   >
@@ -491,6 +521,7 @@ export default function PaymentsPage() {
                                   <div key={payment.id} className="flex flex-col gap-1 text-sm text-emerald-900 sm:flex-row sm:items-center sm:justify-between">
                                     <span className="truncate">
                                       {formatDateTimeBR(payment.paid_at)} · {payment.description || "Pagamento da fatura"}
+                                      {payment.account ? ` · ${payment.account.name}` : ""}
                                     </span>
                                     <span className="font-bold tabular-nums">{formatBRL(Number(payment.amount))}</span>
                                   </div>
@@ -758,7 +789,16 @@ export default function PaymentsPage() {
                               : `Você está prestes a quitar ${confirmation.count} despesa(s) avulsa(s) pendentes de ${confirmation.period}, totalizando ${formatBRL(confirmation.totalAmount)}.`}
                     </p>
                   </div>
-                  <Button type="button" variant="outline" size="sm" onClick={() => setConfirmation(null)} disabled={submittingKey !== null}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setConfirmation(null);
+                      setStatementAccountId("none");
+                    }}
+                    disabled={submittingKey !== null}
+                  >
                     <X className="h-4 w-4" />
                   </Button>
                 </div>
@@ -769,11 +809,51 @@ export default function PaymentsPage() {
                   Essa ação altera o status de pagamento e deve ser confirmada com atenção.
                 </div>
 
+                {confirmation.kind === "statement" && (
+                  <div className="mt-4 space-y-2">
+                    <label className="text-sm font-medium text-neutral-700">Conta</label>
+                    {hasAccounts ? (
+                      <Select value={statementAccountId} onValueChange={setStatementAccountId}>
+                        <SelectTriggerHTML
+                          placeholder="Selecione a conta de onde saiu o dinheiro"
+                          options={accountOptions}
+                          className="h-11 rounded-xl bg-white"
+                        />
+                      </Select>
+                    ) : accountsLoading ? (
+                      <p className="rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-600">Carregando contas...</p>
+                    ) : (
+                      <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                        <p>Nenhuma conta cadastrada. Crie uma conta antes de pagar faturas.</p>
+                        <Link href="/accounts" className="mt-2 inline-flex font-medium text-amber-900 underline underline-offset-4">
+                          Criar conta
+                        </Link>
+                      </div>
+                    )}
+                    <p className="text-xs text-neutral-500">
+                      Essa conta indica de onde saiu o dinheiro para pagar a fatura. A compra no cartão continua registrada apenas na fatura.
+                    </p>
+                  </div>
+                )}
+
                 <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:justify-end">
-                  <Button type="button" variant="outline" onClick={() => setConfirmation(null)} disabled={submittingKey !== null}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setConfirmation(null);
+                      setStatementAccountId("none");
+                    }}
+                    disabled={submittingKey !== null}
+                  >
                     Cancelar
                   </Button>
-                  <Button type="button" onClick={() => void handleConfirmPayment()} disabled={submittingKey !== null} className="bg-neutral-900 text-white hover:bg-neutral-800">
+                  <Button
+                    type="button"
+                    onClick={() => void handleConfirmPayment()}
+                    disabled={submittingKey !== null || (confirmation.kind === "statement" && (!hasAccounts || accountsLoading))}
+                    className="bg-neutral-900 text-white hover:bg-neutral-800"
+                  >
                     {confirmation.kind === "statement"
                       ? "Confirmar pagamento da fatura"
                       : confirmation.kind === "ignore-statement"

@@ -22,11 +22,19 @@ export async function fetchPayments(month: number, year: number, signal?: AbortS
   }
 }
 
-export async function payCardStatement(statementId: number, amount?: number) {
+type PayCardStatementPayload = {
+  amount?: number;
+  accountId: number;
+};
+
+export async function payCardStatement(statementId: number, payload: PayCardStatementPayload) {
   try {
     const data = (await api(`/api/payments/card_statements/${statementId}/pay`, {
       method: "POST",
-      body: JSON.stringify(amount ? { amount } : {}),
+      body: JSON.stringify({
+        ...(payload.amount ? { amount: payload.amount } : {}),
+        account_id: payload.accountId,
+      }),
       cache: "no-store",
     })) as PaymentStatement;
 

@@ -11,6 +11,7 @@ const ignoreLooseExpense = vi.fn();
 const payLooseExpense = vi.fn();
 const payLooseExpenses = vi.fn();
 const usePayments = vi.fn();
+const useAccounts = vi.fn();
 const useAuth = vi.fn();
 
 vi.mock("next/navigation", () => ({
@@ -38,6 +39,10 @@ vi.mock("@/features/payments", () => ({
   payLooseExpenses: (...args: unknown[]) => payLooseExpenses(...args),
 }));
 
+vi.mock("@/features/accounts", () => ({
+  useAccounts: (...args: unknown[]) => useAccounts(...args),
+}));
+
 beforeEach(() => {
   push.mockReset();
   replace.mockReset();
@@ -56,6 +61,12 @@ beforeEach(() => {
   useAuth.mockReturnValue({
     status: "authenticated",
     user: { id: 1, name: "Joao", email: "joao@example.com", active: true },
+  });
+  useAccounts.mockReturnValue({
+    accounts: [{ id: 3, name: "Conta Corrente" }],
+    loading: false,
+    error: null,
+    refetch: vi.fn(),
   });
   usePayments.mockReturnValue({
     loading: false,
@@ -80,6 +91,7 @@ beforeEach(() => {
               description: "Pagamento recebido",
               source: "converted_transaction",
               original_transaction_id: 99,
+              account: null,
             },
           ],
           due_day: 15,
@@ -135,13 +147,114 @@ describe("PaymentsPage", () => {
     render(<PaymentsPage />);
 
     await user.click(screen.getByRole("button", { name: /Pagar fatura/i }));
+    await user.selectOptions(screen.getByDisplayValue("Selecione a conta de onde saiu o dinheiro"), "3");
     await user.click(screen.getByRole("button", { name: /Confirmar pagamento da fatura/i }));
 
     await waitFor(() => {
-      expect(payCardStatement).toHaveBeenCalledWith(1);
+      expect(payCardStatement).toHaveBeenCalledWith(1, { accountId: 3 });
       expect(refetch).toHaveBeenCalled();
       expect(screen.getByText('Fatura do cartão "NUBANK" quitada com sucesso.')).toBeInTheDocument();
     });
+  });
+
+  it("requires an account before paying a card statement", async () => {
+    const user = userEvent.setup();
+    render(<PaymentsPage />);
+
+    await user.click(screen.getByRole("button", { name: /Pagar fatura/i }));
+    await user.click(screen.getByRole("button", { name: /Confirmar pagamento da fatura/i }));
+
+    expect(screen.getByText("Selecione a conta de onde saiu o pagamento da fatura.")).toBeInTheDocument();
+    expect(payCardStatement).not.toHaveBeenCalled();
+  });
+
+  it("shows a friendly API error when statement payment fails", async () => {
+    const user = userEvent.setup();
+    payCardStatement.mockRejectedValue(new Error("Conta não encontrada."));
+
+    render(<PaymentsPage />);
+
+    await user.click(screen.getByRole("button", { name: /Pagar fatura/i }));
+    await user.selectOptions(screen.getByDisplayValue("Selecione a conta de onde saiu o dinheiro"), "3");
+    await user.click(screen.getByRole("button", { name: /Confirmar pagamento da fatura/i }));
+
+    expect(await screen.findByText("Conta não encontrada.")).toBeInTheDocument();
+  });
+
+  it("guides the user to create an account when paying a statement without active accounts", async () => {
+    const user = userEvent.setup();
+    useAccounts.mockReturnValue({
+      accounts: [],
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    render(<PaymentsPage />);
+
+    await user.click(screen.getByRole("button", { name: /Pagar fatura/i }));
+
+    expect(screen.getByText("Nenhuma conta cadastrada. Crie uma conta antes de pagar faturas.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Criar conta" })).toHaveAttribute("href", "/accounts");
+    expect(screen.getByRole("button", { name: /Confirmar pagamento da fatura/i })).toBeDisabled();
+  });
+
+  it("shows the account in statement payment history when available", () => {
+    usePayments.mockReturnValue({
+      loading: false,
+      error: null,
+      refetch,
+      overview: {
+        period: { month: 3, year: 2026 },
+        statements: [
+          {
+            id: 1,
+            card: { id: 1, name: "NUBANK" },
+            billing_statement: "2026-03-01",
+            total_amount: 300,
+            paid_amount: 30,
+            remaining_amount: 270,
+            paid: false,
+            payments: [
+              {
+                id: 10,
+                amount: 30,
+                paid_at: "2026-03-10T12:00:00Z",
+                description: "Pagamento recebido",
+                source: "manual",
+                original_transaction_id: null,
+                account: { id: 3, name: "Conta Corrente" },
+              },
+            ],
+            due_day: 15,
+            closing_day: 8,
+            transactions_count: 4,
+          },
+        ],
+        loose_expenses: {
+          period_label: "03/2026",
+          transactions_count: 0,
+          total_amount: 0,
+          paid: true,
+          transactions: [],
+        },
+        ignored_payments: {
+          period_label: "03/2026",
+          statements_count: 0,
+          statements_total_amount: 0,
+          statements: [],
+          loose_expenses: {
+            transactions_count: 0,
+            total_amount: 0,
+            transactions: [],
+          },
+        },
+      },
+    });
+
+    render(<PaymentsPage />);
+
+    expect(screen.getByText(/Conta Corrente/i)).toBeInTheDocument();
   });
 
   it("shows statement payment history", () => {
