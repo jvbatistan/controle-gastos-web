@@ -4,9 +4,13 @@ import AccountsPage from "@/app/accounts/page";
 
 const push = vi.fn();
 const replace = vi.fn();
+const routerMock = { push, replace };
 const refetchActive = vi.fn();
 const refetchArchived = vi.fn();
 const createAccount = vi.fn();
+const fetchAccountTransfers = vi.fn();
+const createAccountTransfer = vi.fn();
+const reverseAccountTransfer = vi.fn();
 const updateAccount = vi.fn();
 const archiveAccount = vi.fn();
 const restoreAccount = vi.fn();
@@ -63,8 +67,35 @@ const archivedAccounts = [
   },
 ];
 
+const accountTransfers = [
+  {
+    id: 10,
+    from_account: { id: 1, name: "Nubank" },
+    to_account: { id: 2, name: "Carteira" },
+    amount: "200.0",
+    transferred_on: "2026-07-18",
+    description: "Reserva do mês",
+    note: "Movido para carteira",
+    status: "completed" as const,
+    created_at: "2026-07-18T10:00:00Z",
+    updated_at: "2026-07-18T10:00:00Z",
+  },
+  {
+    id: 11,
+    from_account: { id: 2, name: "Carteira" },
+    to_account: { id: 4, name: "Inter" },
+    amount: "50.0",
+    transferred_on: "2026-07-17",
+    description: null,
+    note: null,
+    status: "reversed" as const,
+    created_at: "2026-07-17T10:00:00Z",
+    updated_at: "2026-07-17T10:00:00Z",
+  },
+];
+
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push, replace }),
+  useRouter: () => routerMock,
 }));
 
 vi.mock("@/lib/useAuth", () => ({
@@ -82,6 +113,9 @@ vi.mock("@/components/Navigation", () => ({
 vi.mock("@/features/accounts", () => ({
   useAccounts: (...args: unknown[]) => useAccounts(...args),
   createAccount: (...args: unknown[]) => createAccount(...args),
+  fetchAccountTransfers: (...args: unknown[]) => fetchAccountTransfers(...args),
+  createAccountTransfer: (...args: unknown[]) => createAccountTransfer(...args),
+  reverseAccountTransfer: (...args: unknown[]) => reverseAccountTransfer(...args),
   updateAccount: (...args: unknown[]) => updateAccount(...args),
   archiveAccount: (...args: unknown[]) => archiveAccount(...args),
   restoreAccount: (...args: unknown[]) => restoreAccount(...args),
@@ -93,6 +127,9 @@ beforeEach(() => {
   refetchActive.mockReset().mockResolvedValue(undefined);
   refetchArchived.mockReset().mockResolvedValue(undefined);
   createAccount.mockReset().mockResolvedValue({ status: 201, data: { id: 4, name: "Inter" } });
+  fetchAccountTransfers.mockReset().mockResolvedValue({ status: 200, data: accountTransfers });
+  createAccountTransfer.mockReset().mockResolvedValue({ status: 201, data: accountTransfers[0] });
+  reverseAccountTransfer.mockReset().mockResolvedValue({ status: 200, data: { ...accountTransfers[0], status: "reversed" } });
   updateAccount.mockReset().mockResolvedValue({ status: 200, data: { id: 1, name: "Inter" } });
   archiveAccount.mockReset().mockResolvedValue({ status: 200, data: { id: 1, name: "Nubank" } });
   restoreAccount.mockReset().mockResolvedValue({ status: 200, data: { id: 3, name: "PicPay" } });
@@ -122,7 +159,7 @@ describe("AccountsPage", () => {
 
     expect(screen.getByText("Contas")).toBeInTheDocument();
     expect(screen.getByText("Gerencie onde seu dinheiro está.")).toBeInTheDocument();
-    expect(screen.getByText("Nubank")).toBeInTheDocument();
+    expect(screen.getAllByText("Nubank").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Carteira").length).toBeGreaterThan(0);
     expect(screen.getByText("Inter")).toBeInTheDocument();
     expect(screen.getByText("PicPay")).toBeInTheDocument();
@@ -240,5 +277,231 @@ describe("AccountsPage", () => {
 
     expect(screen.getByText("Carregando contas...")).toBeInTheDocument();
     expect(screen.getByText("Carregando contas arquivadas...")).toBeInTheDocument();
+  });
+
+  it("renders transfer action, history and statuses", async () => {
+    render(<AccountsPage />);
+
+    expect(screen.getAllByRole("button", { name: /Transferir/i }).length).toBeGreaterThan(0);
+    expect(await screen.findByText("Últimas transferências")).toBeInTheDocument();
+    expect(screen.getAllByText("Nubank").length).toBeGreaterThan(0);
+    expect(screen.getByText("Reserva do mês")).toBeInTheDocument();
+    expect(screen.getByText("Concluída")).toBeInTheDocument();
+    expect(screen.getByText("Revertida")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Reverter/i })).toBeInTheDocument();
+  });
+
+  it("disables transfer action with fewer than two active accounts", () => {
+    useAccounts.mockImplementation((params: { archived?: boolean }) => {
+      if (params.archived) {
+        return { accounts: archivedAccounts, loading: false, error: null, refetch: refetchArchived };
+      }
+
+      return { accounts: [activeAccounts[0]], loading: false, error: null, refetch: refetchActive };
+    });
+
+    render(<AccountsPage />);
+
+    expect(screen.getAllByRole("button", { name: /Transferir/i })[0]).toBeDisabled();
+    expect(screen.getByText("Cadastre pelo menos duas contas ativas para transferir dinheiro entre elas.")).toBeInTheDocument();
+  });
+
+  it("opens transfer modal with active accounts only and required fields", async () => {
+    const user = userEvent.setup();
+
+    render(<AccountsPage />);
+
+    await user.click(screen.getAllByRole("button", { name: /Transferir/i })[0]);
+
+    expect(screen.getByText("Transferir entre contas")).toBeInTheDocument();
+    expect(screen.getByText("Conta de origem *")).toBeInTheDocument();
+    expect(screen.getByText("Conta de destino *")).toBeInTheDocument();
+    expect(screen.getByText("Valor *")).toBeInTheDocument();
+    expect(screen.getByText("Data *")).toBeInTheDocument();
+    expect(screen.getAllByRole("option", { name: /Nubank/ }).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("option", { name: /PicPay/ })).not.toBeInTheDocument();
+  });
+
+  it("creates a transfer with the expected payload and refreshes accounts and history", async () => {
+    const user = userEvent.setup();
+
+    render(<AccountsPage />);
+
+    await user.click(screen.getAllByRole("button", { name: /Transferir/i })[0]);
+    fireEvent.change(screen.getByDisplayValue("Selecione a origem"), { target: { value: "1" } });
+    fireEvent.change(screen.getByDisplayValue("Selecione o destino"), { target: { value: "2" } });
+    await user.type(screen.getByPlaceholderText("0,00"), "200,50");
+    fireEvent.change(screen.getByDisplayValue(new Date().toISOString().slice(0, 10)), { target: { value: "2026-07-18" } });
+    await user.type(screen.getByPlaceholderText("Ex: Reserva do mês"), "Reserva do mês");
+    await user.type(screen.getByPlaceholderText("Opcional"), "Movido para carteira");
+
+    await user.click(screen.getByRole("button", { name: /Criar transferência/i }));
+
+    await waitFor(() => {
+      expect(createAccountTransfer).toHaveBeenCalledWith({
+        from_account_id: 1,
+        to_account_id: 2,
+        amount: "200.50",
+        transferred_on: "2026-07-18",
+        description: "Reserva do mês",
+        note: "Movido para carteira",
+      });
+      expect(refetchActive).toHaveBeenCalled();
+      expect(refetchArchived).toHaveBeenCalled();
+      expect(fetchAccountTransfers).toHaveBeenCalledTimes(2);
+      expect(screen.getByText("Transferência criada com sucesso.")).toBeInTheDocument();
+    });
+  });
+
+  it("rejects invalid transfer form values before sending", async () => {
+    const user = userEvent.setup();
+
+    render(<AccountsPage />);
+
+    await user.click(screen.getAllByRole("button", { name: /Transferir/i })[0]);
+    await user.click(screen.getByRole("button", { name: /Criar transferência/i }));
+
+    expect(await screen.findByText("Selecione a conta de origem.")).toBeInTheDocument();
+    expect(createAccountTransfer).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByDisplayValue("Selecione a origem"), { target: { value: "1" } });
+    fireEvent.change(screen.getByDisplayValue("Selecione o destino"), { target: { value: "2" } });
+    fireEvent.change(screen.getByPlaceholderText("0,00"), { target: { value: "0" } });
+    await user.click(screen.getByRole("button", { name: /Criar transferência/i }));
+
+    expect(await screen.findByText("Informe um valor maior que zero.")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText("0,00"), { target: { value: "-10" } });
+    await user.click(screen.getByRole("button", { name: /Criar transferência/i }));
+
+    expect(await screen.findByText("Informe um valor maior que zero.")).toBeInTheDocument();
+
+    expect(createAccountTransfer).not.toHaveBeenCalled();
+  });
+
+  it("prevents future transfer dates", async () => {
+    const user = userEvent.setup();
+
+    render(<AccountsPage />);
+
+    await user.click(screen.getAllByRole("button", { name: /Transferir/i })[0]);
+    const dateInput = screen.getByDisplayValue(new Date().toISOString().slice(0, 10));
+
+    expect(dateInput).toHaveAttribute("max", new Date().toISOString().slice(0, 10));
+
+    fireEvent.change(screen.getByDisplayValue("Selecione a origem"), { target: { value: "1" } });
+    fireEvent.change(screen.getByDisplayValue("Selecione o destino"), { target: { value: "2" } });
+    fireEvent.change(screen.getByPlaceholderText("0,00"), { target: { value: "10" } });
+    fireEvent.change(dateInput, { target: { value: "2999-01-01" } });
+    await user.click(screen.getByRole("button", { name: /Criar transferência/i }));
+
+    expect(createAccountTransfer).not.toHaveBeenCalled();
+  });
+
+  it("shows API error when transfer creation fails", async () => {
+    const user = userEvent.setup();
+    createAccountTransfer.mockRejectedValueOnce(new Error("Conta não encontrada."));
+
+    render(<AccountsPage />);
+
+    await user.click(screen.getAllByRole("button", { name: /Transferir/i })[0]);
+    fireEvent.change(screen.getByDisplayValue("Selecione a origem"), { target: { value: "1" } });
+    fireEvent.change(screen.getByDisplayValue("Selecione o destino"), { target: { value: "2" } });
+    await user.type(screen.getByPlaceholderText("0,00"), "200");
+    await user.click(screen.getByRole("button", { name: /Criar transferência/i }));
+
+    expect(await screen.findByText("Conta não encontrada.")).toBeInTheDocument();
+  });
+
+  it("shows loading while creating a transfer", async () => {
+    const user = userEvent.setup();
+    createAccountTransfer.mockReturnValueOnce(new Promise(() => undefined));
+
+    render(<AccountsPage />);
+
+    await user.click(screen.getAllByRole("button", { name: /Transferir/i })[0]);
+    fireEvent.change(screen.getByDisplayValue("Selecione a origem"), { target: { value: "1" } });
+    fireEvent.change(screen.getByDisplayValue("Selecione o destino"), { target: { value: "2" } });
+    await user.type(screen.getByPlaceholderText("0,00"), "200");
+    await user.click(screen.getByRole("button", { name: /Criar transferência/i }));
+
+    expect(screen.getByRole("button", { name: /Transferindo/i })).toBeDisabled();
+  });
+
+
+  it("warns but does not block when transfer makes origin balance negative", async () => {
+    const user = userEvent.setup();
+
+    render(<AccountsPage />);
+
+    await user.click(screen.getAllByRole("button", { name: /Transferir/i })[0]);
+    fireEvent.change(screen.getByDisplayValue("Selecione a origem"), { target: { value: "2" } });
+    await user.type(screen.getByPlaceholderText("0,00"), "200");
+
+    expect(screen.getByText("Esta transferência deixará a conta de origem com saldo negativo.")).toBeInTheDocument();
+  });
+
+  it("reverses a completed transfer after confirmation and refreshes accounts and history", async () => {
+    const user = userEvent.setup();
+
+    render(<AccountsPage />);
+
+    await user.click(await screen.findByRole("button", { name: /Reverter/i }));
+
+    await waitFor(() => {
+      expect(window.confirm).toHaveBeenCalledWith(
+        "Deseja reverter esta transferência?\n\nOs valores voltarão aos saldos anteriores das contas, mas o registro continuará no histórico."
+      );
+      expect(reverseAccountTransfer).toHaveBeenCalledWith(10);
+      expect(refetchActive).toHaveBeenCalled();
+      expect(refetchArchived).toHaveBeenCalled();
+      expect(fetchAccountTransfers).toHaveBeenCalledTimes(2);
+      expect(screen.getByText("Transferência revertida com sucesso.")).toBeInTheDocument();
+    });
+  });
+
+  it("shows loading while reversing a transfer", async () => {
+    const user = userEvent.setup();
+    reverseAccountTransfer.mockReturnValueOnce(new Promise(() => undefined));
+
+    render(<AccountsPage />);
+
+    await user.click(await screen.findByRole("button", { name: /Reverter/i }));
+
+    expect(screen.getByRole("button", { name: /Revertendo/i })).toBeDisabled();
+  });
+
+  it("does not show reverse action for already reversed transfers", async () => {
+    fetchAccountTransfers.mockResolvedValueOnce({ status: 200, data: [accountTransfers[1]] });
+
+    render(<AccountsPage />);
+
+    expect(await screen.findByText("Revertida")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Reverter/i })).not.toBeInTheDocument();
+  });
+
+  it("shows empty transfer history and load errors", async () => {
+    fetchAccountTransfers.mockResolvedValueOnce({ status: 200, data: [] });
+
+    const { unmount } = render(<AccountsPage />);
+
+    expect(await screen.findByText("Nenhuma transferência registrada.")).toBeInTheDocument();
+
+    unmount();
+    fetchAccountTransfers.mockRejectedValueOnce(new Error("Falha"));
+    render(<AccountsPage />);
+
+    expect(await screen.findByText("Não foi possível carregar as transferências.")).toBeInTheDocument();
+  });
+
+  it("shows API error when reversing fails", async () => {
+    const user = userEvent.setup();
+    reverseAccountTransfer.mockRejectedValueOnce(new Error("Não foi possível reverter."));
+
+    render(<AccountsPage />);
+
+    await user.click(await screen.findByRole("button", { name: /Reverter/i }));
+
+    expect(await screen.findByText("Não foi possível reverter.")).toBeInTheDocument();
   });
 });

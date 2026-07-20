@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Archive, Pencil, Plus, RotateCcw, Wallet, X } from "lucide-react";
+import { Archive, ArrowRight, ArrowRightLeft, Pencil, Plus, RotateCcw, Wallet, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
@@ -10,11 +10,15 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectTriggerHTML } from "@/components/ui/select";
 import {
   archiveAccount,
+  createAccountTransfer,
   createAccount,
+  fetchAccountTransfers,
+  reverseAccountTransfer,
   restoreAccount,
   updateAccount,
   useAccounts,
   type Account,
+  type AccountTransfer,
   type AccountKind,
 } from "@/features/accounts";
 import { useAuth } from "@/lib/useAuth";
@@ -32,6 +36,15 @@ const initialForm = {
   kind: "checking" as AccountKind,
   initial_balance: "0",
   initial_balance_date: new Date().toISOString().slice(0, 10),
+};
+
+const initialTransferForm = {
+  from_account_id: "",
+  to_account_id: "",
+  amount: "",
+  transferred_on: new Date().toISOString().slice(0, 10),
+  description: "",
+  note: "",
 };
 
 function formatBRL(value: number | string) {
@@ -59,9 +72,16 @@ export default function AccountsPage() {
   const router = useRouter();
   const auth = useAuth();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isTransferDialogOpen, setIsTransferDialogOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [form, setForm] = useState(initialForm);
+  const [transferForm, setTransferForm] = useState(initialTransferForm);
+  const [transfers, setTransfers] = useState<AccountTransfer[]>([]);
+  const [transfersLoading, setTransfersLoading] = useState(true);
+  const [transfersError, setTransfersError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [transferSubmitting, setTransferSubmitting] = useState(false);
+  const [reversingTransferId, setReversingTransferId] = useState<number | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -81,6 +101,38 @@ export default function AccountsPage() {
     archived: true,
   });
 
+  const loadTransfers = useCallback(async (signal?: AbortSignal) => {
+    try {
+      setTransfersLoading(true);
+      setTransfersError(null);
+      const result = await fetchAccountTransfers({ signal });
+
+      if (result.status === 401) {
+        handleUnauthorized();
+        return;
+      }
+
+      setTransfers(result.data);
+    } catch (err) {
+      if (!(err instanceof DOMException && err.name === "AbortError")) {
+        console.error(err);
+        setTransfers([]);
+        setTransfersError("Não foi possível carregar as transferências.");
+      }
+    } finally {
+      if (!signal?.aborted) setTransfersLoading(false);
+    }
+  }, [handleUnauthorized]);
+
+  useEffect(() => {
+    if (auth.status !== "authenticated") return;
+
+    const controller = new AbortController();
+    void loadTransfers(controller.signal);
+
+    return () => controller.abort();
+  }, [auth.status, loadTransfers]);
+
   const availablePatrimony = useMemo(
     () => activeAccounts.accounts.reduce((sum, account) => sum + Number(account.current_balance), 0),
     [activeAccounts.accounts]
@@ -89,11 +141,26 @@ export default function AccountsPage() {
     () => activeAccounts.accounts.filter((account) => account.kind === "wallet" || account.kind === "digital_wallet").length,
     [activeAccounts.accounts]
   );
+  const canTransfer = activeAccounts.accounts.length >= 2;
+  const latestTransfers = useMemo(() => transfers.slice(0, 10), [transfers]);
+  const selectedFromAccount = useMemo(
+    () => activeAccounts.accounts.find((account) => String(account.id) === transferForm.from_account_id),
+    [activeAccounts.accounts, transferForm.from_account_id]
+  );
+  const transferAmount = parseMoney(transferForm.amount);
+  const transferWouldMakeOriginNegative = Boolean(
+    selectedFromAccount && transferAmount > Number(selectedFromAccount.current_balance)
+  );
 
   function resetForm() {
     setForm(initialForm);
     setEditingAccount(null);
     setIsDialogOpen(false);
+  }
+
+  function resetTransferForm() {
+    setTransferForm(initialTransferForm);
+    setIsTransferDialogOpen(false);
   }
 
   function openCreateDialog() {
@@ -102,6 +169,15 @@ export default function AccountsPage() {
     setActionError(null);
     setMessage(null);
     setIsDialogOpen(true);
+  }
+
+  function openTransferDialog() {
+    if (!canTransfer) return;
+
+    setTransferForm(initialTransferForm);
+    setActionError(null);
+    setMessage(null);
+    setIsTransferDialogOpen(true);
   }
 
   function startEdit(account: Account) {
@@ -119,6 +195,10 @@ export default function AccountsPage() {
 
   async function refetchAll() {
     await Promise.all([activeAccounts.refetch(), archivedAccounts.refetch()]);
+  }
+
+  async function refetchAccountsAndTransfers() {
+    await Promise.all([refetchAll(), loadTransfers()]);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -197,6 +277,67 @@ export default function AccountsPage() {
     }
   }
 
+  async function handleCreateTransfer(e: React.FormEvent) {
+    e.preventDefault();
+    setTransferSubmitting(true);
+    setActionError(null);
+    setMessage(null);
+
+    try {
+      const validationError = validateTransferForm(transferForm);
+      if (validationError) throw new Error(validationError);
+
+      const payload = {
+        from_account_id: Number(transferForm.from_account_id),
+        to_account_id: Number(transferForm.to_account_id),
+        amount: parseMoney(transferForm.amount).toFixed(2),
+        transferred_on: transferForm.transferred_on,
+        description: transferForm.description.trim() || undefined,
+        note: transferForm.note.trim() || undefined,
+      };
+
+      const result = await createAccountTransfer(payload);
+      if (result.status === 401) {
+        handleUnauthorized();
+        return;
+      }
+
+      resetTransferForm();
+      setMessage("Transferência criada com sucesso.");
+      await refetchAccountsAndTransfers();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Não foi possível criar a transferência.");
+    } finally {
+      setTransferSubmitting(false);
+    }
+  }
+
+  async function handleReverseTransfer(transfer: AccountTransfer) {
+    const confirmed = window.confirm(
+      "Deseja reverter esta transferência?\n\nOs valores voltarão aos saldos anteriores das contas, mas o registro continuará no histórico."
+    );
+    if (!confirmed) return;
+
+    setReversingTransferId(transfer.id);
+    setActionError(null);
+    setMessage(null);
+
+    try {
+      const result = await reverseAccountTransfer(transfer.id);
+      if (result.status === 401) {
+        handleUnauthorized();
+        return;
+      }
+
+      setMessage("Transferência revertida com sucesso.");
+      await refetchAccountsAndTransfers();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Não foi possível reverter a transferência.");
+    } finally {
+      setReversingTransferId(null);
+    }
+  }
+
   if (auth.status !== "authenticated") {
     return <div className="min-h-screen bg-neutral-50" />;
   }
@@ -208,11 +349,28 @@ export default function AccountsPage() {
           <h1 className="text-2xl font-bold text-neutral-900 sm:text-3xl">Contas</h1>
           <p className="mt-1 text-sm text-neutral-500 sm:text-base">Gerencie onde seu dinheiro está.</p>
         </div>
-        <Button type="button" onClick={openCreateDialog} className="w-full rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 sm:w-auto">
-          <Plus className="mr-2 h-4 w-4" />
-          Nova conta
-        </Button>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+          <Button
+            type="button"
+            onClick={openTransferDialog}
+            disabled={!canTransfer || activeAccounts.loading}
+            className="w-full rounded-xl bg-blue-600 text-white hover:bg-blue-700 sm:w-auto"
+          >
+            <ArrowRightLeft className="mr-2 h-4 w-4" />
+            Transferir
+          </Button>
+          <Button type="button" onClick={openCreateDialog} className="w-full rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 sm:w-auto">
+            <Plus className="mr-2 h-4 w-4" />
+            Nova conta
+          </Button>
+        </div>
       </div>
+
+      {!canTransfer && !activeAccounts.loading && (
+        <p className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-700">
+          Cadastre pelo menos duas contas ativas para transferir dinheiro entre elas.
+        </p>
+      )}
 
       {message && (
         <p className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{message}</p>
@@ -286,6 +444,45 @@ export default function AccountsPage() {
                   account={account}
                   onEdit={startEdit}
                   onArchive={(selected) => void handleArchive(selected)}
+                />
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <CardTitle>Últimas transferências</CardTitle>
+            <p className="mt-1 text-sm text-neutral-500">Movimentos entre contas. Não aparecem como receita ou despesa.</p>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={openTransferDialog}
+            disabled={!canTransfer || activeAccounts.loading}
+            className="w-full sm:w-auto"
+          >
+            <ArrowRightLeft className="mr-2 h-4 w-4" />
+            Transferir
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {transfersLoading ? (
+            <p className="text-sm text-neutral-500">Carregando transferências...</p>
+          ) : transfersError ? (
+            <p className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{transfersError}</p>
+          ) : latestTransfers.length === 0 ? (
+            <p className="text-sm text-neutral-500">Nenhuma transferência registrada.</p>
+          ) : (
+            <div className="space-y-3">
+              {latestTransfers.map((transfer) => (
+                <TransferCard
+                  key={transfer.id}
+                  transfer={transfer}
+                  reversing={reversingTransferId === transfer.id}
+                  onReverse={(selected) => void handleReverseTransfer(selected)}
                 />
               ))}
             </div>
@@ -392,6 +589,121 @@ export default function AccountsPage() {
           </div>
         </div>
       )}
+
+      {isTransferDialogOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-bold text-neutral-900">Transferir entre contas</h2>
+                <p className="mt-1 text-sm text-neutral-500">Movimente dinheiro entre contas sem alterar receitas, despesas ou dashboard mensal.</p>
+              </div>
+              <button type="button" onClick={resetTransferForm} className="rounded-lg p-2 text-neutral-500 hover:bg-neutral-100">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateTransfer} className="space-y-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-neutral-800">Conta de origem *</label>
+                  <Select
+                    value={transferForm.from_account_id}
+                    onValueChange={(value) => setTransferForm((current) => ({
+                      ...current,
+                      from_account_id: value,
+                      to_account_id: current.to_account_id === value ? "" : current.to_account_id,
+                    }))}
+                  >
+                    <SelectTriggerHTML
+                      placeholder="Selecione a origem"
+                      options={accountTransferOptions(activeAccounts.accounts)}
+                      className="h-11 rounded-xl"
+                    />
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-neutral-800">Conta de destino *</label>
+                  <Select
+                    value={transferForm.to_account_id}
+                    onValueChange={(value) => setTransferForm((current) => ({ ...current, to_account_id: value }))}
+                  >
+                    <SelectTriggerHTML
+                      placeholder="Selecione o destino"
+                      options={accountTransferOptions(activeAccounts.accounts, transferForm.from_account_id)}
+                      className="h-11 rounded-xl"
+                    />
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-neutral-800">Valor *</label>
+                  <Input
+                    value={transferForm.amount}
+                    onChange={(event) => setTransferForm((current) => ({ ...current, amount: event.target.value }))}
+                    placeholder="0,00"
+                    inputMode="decimal"
+                    disabled={transferSubmitting}
+                    className="h-11 rounded-xl"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-neutral-800">Data *</label>
+                  <Input
+                    type="date"
+                    value={transferForm.transferred_on}
+                    max={new Date().toISOString().slice(0, 10)}
+                    onChange={(event) => setTransferForm((current) => ({ ...current, transferred_on: event.target.value }))}
+                    disabled={transferSubmitting}
+                    className="h-11 rounded-xl"
+                  />
+                </div>
+              </div>
+
+              {transferWouldMakeOriginNegative && (
+                <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+                  Esta transferência deixará a conta de origem com saldo negativo.
+                </p>
+              )}
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-neutral-800">Descrição</label>
+                <Input
+                  value={transferForm.description}
+                  onChange={(event) => setTransferForm((current) => ({ ...current, description: event.target.value }))}
+                  placeholder="Ex: Reserva do mês"
+                  disabled={transferSubmitting}
+                  className="h-11 rounded-xl"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-neutral-800">Observação</label>
+                <Input
+                  value={transferForm.note}
+                  onChange={(event) => setTransferForm((current) => ({ ...current, note: event.target.value }))}
+                  placeholder="Opcional"
+                  disabled={transferSubmitting}
+                  className="h-11 rounded-xl"
+                />
+              </div>
+
+              <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
+                <Button type="button" variant="outline" onClick={resetTransferForm} disabled={transferSubmitting}>
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={transferSubmitting} className="bg-blue-600 text-white hover:bg-blue-700">
+                  {transferSubmitting ? "Transferindo..." : "Criar transferência"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </AppLayout>
   );
 }
@@ -466,6 +778,76 @@ function AccountCard({
       </div>
     </div>
   );
+}
+
+function TransferCard({
+  transfer,
+  reversing,
+  onReverse,
+}: {
+  transfer: AccountTransfer;
+  reversing: boolean;
+  onReverse: (transfer: AccountTransfer) => void;
+}) {
+  const completed = transfer.status === "completed";
+
+  return (
+    <div className="rounded-2xl border border-neutral-200 p-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2 font-semibold text-neutral-950">
+            <span className="truncate">{transfer.from_account.name}</span>
+            <ArrowRight className="h-4 w-4 text-neutral-400" />
+            <span className="truncate">{transfer.to_account.name}</span>
+          </div>
+          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-neutral-500">
+            <span className="font-semibold tabular-nums text-neutral-900">{formatBRL(transfer.amount)}</span>
+            <span>{formatDateBR(transfer.transferred_on)}</span>
+            <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${completed ? "bg-emerald-50 text-emerald-700" : "bg-neutral-100 text-neutral-600"}`}>
+              {completed ? "Concluída" : "Revertida"}
+            </span>
+          </div>
+          {transfer.description && <p className="mt-2 text-sm text-neutral-700">{transfer.description}</p>}
+        </div>
+
+        {completed && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={reversing}
+            className="w-full text-rose-600 hover:bg-rose-50 hover:text-rose-700 sm:w-auto"
+            onClick={() => onReverse(transfer)}
+          >
+            <RotateCcw className="mr-2 h-4 w-4" />
+            {reversing ? "Revertendo..." : "Reverter"}
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function accountTransferOptions(accounts: Account[], disabledAccountId?: string) {
+  return accounts.map((account) => ({
+    value: String(account.id),
+    label: `${account.name} — ${kindLabel(account.kind)} — Saldo ${formatBRL(account.current_balance)}`,
+    disabled: disabledAccountId === String(account.id),
+  }));
+}
+
+function validateTransferForm(form: typeof initialTransferForm) {
+  if (!form.from_account_id) return "Selecione a conta de origem.";
+  if (!form.to_account_id) return "Selecione a conta de destino.";
+  if (form.from_account_id === form.to_account_id) return "A conta de destino deve ser diferente da origem.";
+
+  const amount = parseMoney(form.amount);
+  if (!Number.isFinite(amount) || amount <= 0) return "Informe um valor maior que zero.";
+
+  if (!form.transferred_on) return "Informe a data da transferência.";
+  if (form.transferred_on > new Date().toISOString().slice(0, 10)) return "A data da transferência não pode ser futura.";
+
+  return null;
 }
 
 function balanceTextClass(value: number) {
