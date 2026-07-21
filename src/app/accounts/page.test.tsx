@@ -176,6 +176,21 @@ describe("AccountsPage", () => {
     expect(screen.getAllByText("Carteira digital").length).toBeGreaterThan(0);
   });
 
+  it("navigates to the account statement for active and archived accounts", async () => {
+    const user = userEvent.setup();
+
+    render(<AccountsPage />);
+
+    const statementActions = screen.getAllByRole("button", { name: /Ver extrato/i });
+    expect(statementActions).toHaveLength(4);
+
+    await user.click(statementActions[0]);
+    expect(push).toHaveBeenCalledWith("/accounts/1");
+
+    await user.click(statementActions[3]);
+    expect(push).toHaveBeenCalledWith("/accounts/3");
+  });
+
   it("creates an account and refreshes active and archived lists", async () => {
     const user = userEvent.setup();
 

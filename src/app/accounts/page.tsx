@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Archive, ArrowRight, ArrowRightLeft, Pencil, Plus, RotateCcw, Wallet, X } from "lucide-react";
+import { Archive, ArrowRight, ArrowRightLeft, Eye, Pencil, Plus, RotateCcw, Wallet, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
@@ -191,6 +191,10 @@ export default function AccountsPage() {
     setActionError(null);
     setMessage(null);
     setIsDialogOpen(true);
+  }
+
+  function viewStatement(account: Account) {
+    router.push(`/accounts/${account.id}`);
   }
 
   async function refetchAll() {
@@ -442,6 +446,7 @@ export default function AccountsPage() {
                 <AccountCard
                   key={account.id}
                   account={account}
+                  onViewStatement={viewStatement}
                   onEdit={startEdit}
                   onArchive={(selected) => void handleArchive(selected)}
                 />
@@ -507,6 +512,7 @@ export default function AccountsPage() {
                   key={account.id}
                   account={account}
                   archived
+                  onViewStatement={viewStatement}
                   onRestore={(selected) => void handleRestore(selected)}
                 />
               ))}
@@ -714,12 +720,14 @@ function AccountCard({
   onEdit,
   onArchive,
   onRestore,
+  onViewStatement,
 }: {
   account: Account;
   archived?: boolean;
   onEdit?: (account: Account) => void;
   onArchive?: (account: Account) => void;
   onRestore?: (account: Account) => void;
+  onViewStatement?: (account: Account) => void;
 }) {
   const currentBalance = Number(account.current_balance);
 
@@ -757,6 +765,12 @@ function AccountCard({
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
+        {onViewStatement && (
+          <Button type="button" variant="outline" size="sm" onClick={() => onViewStatement(account)}>
+            <Eye className="mr-2 h-4 w-4" />
+            Ver extrato
+          </Button>
+        )}
         {!archived && onEdit && (
           <Button type="button" variant="outline" size="sm" onClick={() => onEdit(account)}>
             <Pencil className="mr-2 h-4 w-4" />
