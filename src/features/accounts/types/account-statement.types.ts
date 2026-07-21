@@ -72,6 +72,8 @@ export type AccountStatementResponse = {
 export type FetchAccountStatementParams = {
   startDate?: string;
   endDate?: string;
+  movementType?: StatementMovementType;
+  direction?: StatementDirection;
   page?: number;
   perPage?: number;
   signal?: AbortSignal;

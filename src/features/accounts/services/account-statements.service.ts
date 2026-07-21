@@ -6,6 +6,8 @@ export async function fetchAccountStatement(accountId: number, params: FetchAcco
 
   if (params.startDate) searchParams.set("start_date", params.startDate);
   if (params.endDate) searchParams.set("end_date", params.endDate);
+  if (params.movementType) searchParams.set("movement_type", params.movementType);
+  if (params.direction) searchParams.set("direction", params.direction);
   if (params.page) searchParams.set("page", String(params.page));
   if (params.perPage) searchParams.set("per_page", String(params.perPage));
 

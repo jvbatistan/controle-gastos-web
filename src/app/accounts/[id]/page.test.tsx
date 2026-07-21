@@ -146,6 +146,26 @@ const statement = {
   ],
 };
 
+const filteredStatement = {
+  ...statement,
+  filters: {
+    movement_type: "transfer_out" as const,
+    direction: "debit" as const,
+  },
+  summary: {
+    credits_total: "0.0",
+    debits_total: "300.0",
+    net_total: "-300.0",
+  },
+  pagination: {
+    page: 1,
+    per_page: 25,
+    total_count: 1,
+    total_pages: 1,
+  },
+  items: [statement.items[5]],
+};
+
 beforeEach(() => {
   push.mockReset();
   replace.mockReset();
@@ -159,7 +179,7 @@ beforeEach(() => {
 });
 
 describe("AccountStatementPage", () => {
-  it("renders account header, summary and all supported movement types", async () => {
+  it("renders account header, summary, count and all supported movement types", async () => {
     render(<AccountStatementPage />);
 
     expect(screen.getByText("Carregando extrato...")).toBeInTheDocument();
@@ -169,12 +189,13 @@ describe("AccountStatementPage", () => {
     expect(screen.getByText("Ativa")).toBeInTheDocument();
     expect(screen.getByText("Saldo atual")).toBeInTheDocument();
     expect(screen.getByText("R$ 1.500,00")).toBeInTheDocument();
-    expect(screen.getByText("Entradas")).toBeInTheDocument();
-    expect(screen.getByText("Saídas")).toBeInTheDocument();
+    expect(screen.getAllByText("Entradas").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Saídas").length).toBeGreaterThan(0);
     expect(screen.getByText("Variação líquida")).toBeInTheDocument();
     expect(screen.getByText("R$ 3.000,00")).toBeInTheDocument();
     expect(screen.getByText("R$ 1.200,00")).toBeInTheDocument();
     expect(screen.getByText("R$ 1.800,00")).toBeInTheDocument();
+    expect(screen.getAllByText("6 movimentações encontradas").length).toBeGreaterThan(0);
 
     expect(screen.getAllByText("Saldo inicial").length).toBeGreaterThan(0);
     expect(screen.getByText("SALÁRIO")).toBeInTheDocument();
@@ -188,11 +209,11 @@ describe("AccountStatementPage", () => {
     expect(screen.getByText("- R$ 500,00")).toBeInTheDocument();
     expect(screen.getByText("+ R$ 250,00")).toBeInTheDocument();
     expect(screen.getByText("- R$ 300,00")).toBeInTheDocument();
-    expect(screen.getByText(/Categoria: Salário/)).toBeInTheDocument();
-    expect(screen.getByText(/Cartão: NUBANK VISA/)).toBeInTheDocument();
-    expect(screen.getByText(/Contraparte: Reserva/)).toBeInTheDocument();
-    expect(screen.getByText(/Contraparte: Carteira/)).toBeInTheDocument();
-    expect(screen.getByText("Página 1 de 2 · 6 movimentações")).toBeInTheDocument();
+    expect(screen.getByText("Salário")).toBeInTheDocument();
+    expect(screen.getByText("NUBANK VISA")).toBeInTheDocument();
+    expect(screen.getByText("Reserva")).toBeInTheDocument();
+    expect(screen.getByText("Carteira")).toBeInTheDocument();
+    expect(screen.getByText("Página 1 de 2 · 6 movimentações encontradas")).toBeInTheDocument();
   });
 
   it("shows archived account as read-only", async () => {
@@ -221,17 +242,82 @@ describe("AccountStatementPage", () => {
 
     fireEvent.change(screen.getByLabelText("Data inicial"), { target: { value: "2026-07-10" } });
     fireEvent.change(screen.getByLabelText("Data final"), { target: { value: "2026-07-20" } });
-    fireEvent.submit(screen.getByRole("form", { name: "Filtros de período" }));
+    fireEvent.submit(screen.getByRole("form", { name: "Filtros do extrato" }));
 
     await waitFor(() => {
       expect(fetchAccountStatement).toHaveBeenLastCalledWith(1, {
         startDate: "2026-07-10",
         endDate: "2026-07-20",
+        movementType: undefined,
+        direction: undefined,
         page: 1,
         perPage: 25,
         signal: undefined,
       });
       expect(push).toHaveBeenCalledWith("/accounts/1?start_date=2026-07-10&end_date=2026-07-20");
+    });
+  });
+
+  it("applies movement type and direction filters through the API", async () => {
+    render(<AccountStatementPage />);
+
+    await screen.findByRole("heading", { name: "Nubank" });
+    fetchAccountStatement.mockResolvedValueOnce({ status: 200, data: filteredStatement });
+
+    fireEvent.change(screen.getByLabelText("Tipo"), { target: { value: "transfer_out" } });
+
+    await waitFor(() => {
+      expect(fetchAccountStatement).toHaveBeenLastCalledWith(1, {
+        startDate: "2026-07-01",
+        endDate: "2026-07-31",
+        movementType: "transfer_out",
+        direction: undefined,
+        page: 1,
+        perPage: 25,
+        signal: undefined,
+      });
+      expect(push).toHaveBeenCalledWith("/accounts/1?start_date=2026-07-01&end_date=2026-07-31&movement_type=transfer_out");
+    });
+
+    fetchAccountStatement.mockResolvedValueOnce({ status: 200, data: filteredStatement });
+    fireEvent.change(screen.getByLabelText("Direção"), { target: { value: "debit" } });
+
+    await waitFor(() => {
+      expect(fetchAccountStatement).toHaveBeenLastCalledWith(1, {
+        startDate: "2026-07-01",
+        endDate: "2026-07-31",
+        movementType: "transfer_out",
+        direction: "debit",
+        page: 1,
+        perPage: 25,
+        signal: undefined,
+      });
+      expect(push).toHaveBeenCalledWith("/accounts/1?start_date=2026-07-01&end_date=2026-07-31&movement_type=transfer_out&direction=debit");
+    });
+
+    expect(await screen.findByText("1 movimentação encontrada")).toBeInTheDocument();
+    expect(screen.getByText("Tipo: Transferência enviada")).toBeInTheDocument();
+    expect(screen.getByText("Direção: Saída")).toBeInTheDocument();
+    expect(screen.getByText("R$ 0,00")).toBeInTheDocument();
+    expect(screen.getByText("R$ 300,00")).toBeInTheDocument();
+    expect(screen.getByText("-R$ 300,00")).toBeInTheDocument();
+  });
+
+  it("reads filters from query params on initial load", async () => {
+    window.history.pushState({}, "", "/accounts/1?start_date=2026-07-01&end_date=2026-07-31&movement_type=income&direction=credit&page=3");
+
+    render(<AccountStatementPage />);
+
+    await waitFor(() => {
+      expect(fetchAccountStatement).toHaveBeenCalledWith(1, {
+        startDate: "2026-07-01",
+        endDate: "2026-07-31",
+        movementType: "income",
+        direction: "credit",
+        page: 3,
+        perPage: 25,
+        signal: expect.any(AbortSignal),
+      });
     });
   });
 
@@ -244,24 +330,26 @@ describe("AccountStatementPage", () => {
 
     fireEvent.change(screen.getByLabelText("Data inicial"), { target: { value: "2026-07-20" } });
     fireEvent.change(screen.getByLabelText("Data final"), { target: { value: "2026-07-10" } });
-    fireEvent.submit(screen.getByRole("form", { name: "Filtros de período" }));
+    fireEvent.submit(screen.getByRole("form", { name: "Filtros do extrato" }));
 
     expect(screen.getByText("A data inicial deve ser anterior ou igual à data final.")).toBeInTheDocument();
     expect(fetchAccountStatement).not.toHaveBeenCalled();
   });
 
-  it("clears period filters and reloads the default statement", async () => {
-    window.history.pushState({}, "", "/accounts/1?start_date=2026-07-01&end_date=2026-07-31&page=2");
+  it("clears all filters and reloads the default statement", async () => {
+    window.history.pushState({}, "", "/accounts/1?start_date=2026-07-01&end_date=2026-07-31&movement_type=transfer_out&direction=debit&page=2");
     render(<AccountStatementPage />);
 
     await screen.findByRole("heading", { name: "Nubank" });
     await waitFor(() => expect(screen.getByRole("button", { name: "Aplicar" })).toBeEnabled());
-    fireEvent.click(screen.getByRole("button", { name: "Limpar" }));
+    fireEvent.click(screen.getByRole("button", { name: "Limpar filtros" }));
 
     await waitFor(() => {
       expect(fetchAccountStatement).toHaveBeenLastCalledWith(1, {
         startDate: undefined,
         endDate: undefined,
+        movementType: undefined,
+        direction: undefined,
         page: 1,
         perPage: 25,
         signal: undefined,
@@ -270,33 +358,55 @@ describe("AccountStatementPage", () => {
     });
   });
 
-  it("navigates through pagination and disables unavailable directions", async () => {
+  it("removes individual active filters", async () => {
+    window.history.pushState({}, "", "/accounts/1?start_date=2026-07-01&end_date=2026-07-31&movement_type=expense&direction=debit");
     render(<AccountStatementPage />);
 
     await screen.findByRole("heading", { name: "Nubank" });
-    await waitFor(() => expect(screen.getByRole("button", { name: "Aplicar" })).toBeEnabled());
-    expect(screen.getByRole("button", { name: "Anterior" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: /Remover filtro Tipo/ }));
+
+    await waitFor(() => {
+      expect(fetchAccountStatement).toHaveBeenLastCalledWith(1, {
+        startDate: "2026-07-01",
+        endDate: "2026-07-31",
+        movementType: undefined,
+        direction: "debit",
+        page: 1,
+        perPage: 25,
+        signal: undefined,
+      });
+    });
+  });
+
+  it("navigates through pagination and preserves filters", async () => {
+    window.history.pushState({}, "", "/accounts/1?start_date=2026-07-01&end_date=2026-07-31&movement_type=income&direction=credit");
+    render(<AccountStatementPage />);
+
+    await screen.findByRole("heading", { name: "Nubank" });
     await waitFor(() => expect(screen.getByRole("button", { name: "Próxima" })).toBeEnabled());
 
     fireEvent.click(screen.getByRole("button", { name: "Próxima" }));
 
     await waitFor(() => {
       expect(fetchAccountStatement).toHaveBeenLastCalledWith(1, {
-        startDate: undefined,
-        endDate: undefined,
+        startDate: "2026-07-01",
+        endDate: "2026-07-31",
+        movementType: "income",
+        direction: "credit",
         page: 2,
         perPage: 25,
         signal: undefined,
       });
-      expect(push).toHaveBeenCalledWith("/accounts/1?page=2");
+      expect(push).toHaveBeenCalledWith("/accounts/1?start_date=2026-07-01&end_date=2026-07-31&movement_type=income&direction=credit&page=2");
     });
   });
 
-  it("shows empty state when there are no statement items", async () => {
+  it("shows contextual empty states and zero count", async () => {
     fetchAccountStatement.mockResolvedValueOnce({
       status: 200,
       data: {
         ...statement,
+        filters: { movement_type: null, direction: null },
         items: [],
         pagination: { page: 1, per_page: 25, total_count: 0, total_pages: 0 },
       },
@@ -304,8 +414,66 @@ describe("AccountStatementPage", () => {
 
     render(<AccountStatementPage />);
 
-    expect(await screen.findByText("Nenhuma movimentação encontrada neste período.")).toBeInTheDocument();
+    expect(await screen.findByText("Nenhuma movimentação encontrada")).toBeInTheDocument();
+    expect(screen.getByText("Nenhuma movimentação encontrada neste período.")).toBeInTheDocument();
     expect(screen.getByText("Tente ajustar o período selecionado.")).toBeInTheDocument();
+  });
+
+  it("shows filtered empty state", async () => {
+    fetchAccountStatement.mockResolvedValueOnce({
+      status: 200,
+      data: {
+        ...statement,
+        filters: { movement_type: "income" as const, direction: null },
+        items: [],
+        pagination: { page: 1, per_page: 25, total_count: 0, total_pages: 0 },
+      },
+    });
+    window.history.pushState({}, "", "/accounts/1?movement_type=income");
+
+    render(<AccountStatementPage />);
+
+    expect(await screen.findByText("Nenhuma movimentação corresponde aos filtros selecionados.")).toBeInTheDocument();
+    expect(screen.getByText("Tente remover tipo ou direção para ampliar a consulta.")).toBeInTheDocument();
+  });
+
+  it("does not render unsafe missing metadata", async () => {
+    fetchAccountStatement.mockResolvedValueOnce({
+      status: 200,
+      data: {
+        ...statement,
+        items: [
+          {
+            ...statement.items[1],
+            metadata: { category: null, source: null, note: "[object Object]" },
+            description: "undefined",
+          },
+        ],
+      },
+    });
+
+    render(<AccountStatementPage />);
+
+    await screen.findByText("SALÁRIO");
+    expect(screen.queryByText("[object Object]")).not.toBeInTheDocument();
+    expect(screen.queryByText("undefined")).not.toBeInTheDocument();
+  });
+
+  it("keeps the page structure and shows localized loading during updates", async () => {
+    render(<AccountStatementPage />);
+
+    await screen.findByRole("heading", { name: "Nubank" });
+    let resolveUpdate: (value: unknown) => void = () => undefined;
+    fetchAccountStatement.mockImplementationOnce(() => new Promise((resolve) => {
+      resolveUpdate = resolve;
+    }));
+
+    fireEvent.change(screen.getByLabelText("Direção"), { target: { value: "credit" } });
+
+    expect(screen.getByRole("heading", { name: "Nubank" })).toBeInTheDocument();
+    expect(await screen.findByRole("status")).toHaveTextContent("Atualizando...");
+
+    resolveUpdate({ status: 200, data: statement });
   });
 
   it("shows not found errors with a return action", async () => {

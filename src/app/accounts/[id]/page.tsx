@@ -3,15 +3,21 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowDownLeft, ArrowLeft, ArrowUpRight, CalendarDays, CreditCard, Landmark, RefreshCcw, Wallet } from "lucide-react";
+import { ArrowLeft, CalendarDays, Wallet } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
+  DIRECTION_LABELS,
+  DIRECTION_OPTIONS,
+  MOVEMENT_TYPE_ICONS,
+  MOVEMENT_TYPE_LABELS,
+  MOVEMENT_TYPE_OPTIONS,
   fetchAccountStatement,
   type AccountKind,
   type AccountStatementResponse,
+  type StatementDirection,
   type StatementEntry,
   type StatementMovementType,
 } from "@/features/accounts";
@@ -25,19 +31,18 @@ const accountKindLabels: Record<AccountKind, string> = {
   other: "Outra",
 };
 
-const movementLabels: Record<StatementMovementType, string> = {
-  initial_balance: "Saldo inicial",
-  income: "Entrada",
-  expense: "Saída",
-  card_statement_payment: "Pagamento de fatura",
-  transfer_in: "Transferência recebida",
-  transfer_out: "Transferência enviada",
-};
-
 const sourceLabels: Record<string, string> = {
   cash: "Dinheiro",
   bank: "Banco",
   card: "Cartão",
+};
+
+type StatementFilters = {
+  startDate: string;
+  endDate: string;
+  movementType: StatementMovementType | "";
+  direction: StatementDirection | "";
+  page: number;
 };
 
 function formatBRL(value: number | string) {
@@ -47,7 +52,7 @@ function formatBRL(value: number | string) {
   });
 }
 
-function formatSignedBRL(value: number | string, direction: "credit" | "debit") {
+function formatSignedBRL(value: number | string, direction: StatementDirection) {
   const prefix = direction === "credit" ? "+" : "-";
 
   return `${prefix} ${formatBRL(value)}`;
@@ -76,6 +81,35 @@ function errorMessageFor(err: unknown) {
   return "Não foi possível carregar o extrato.";
 }
 
+function readFiltersFromUrl(): StatementFilters {
+  const searchParams = new URLSearchParams(window.location.search);
+  const movementType = searchParams.get("movement_type");
+  const direction = searchParams.get("direction");
+
+  return {
+    startDate: searchParams.get("start_date") ?? "",
+    endDate: searchParams.get("end_date") ?? "",
+    movementType: isMovementType(movementType) ? movementType : "",
+    direction: isDirection(direction) ? direction : "",
+    page: Math.max(Number(searchParams.get("page") ?? "1"), 1),
+  };
+}
+
+function isMovementType(value: string | null): value is StatementMovementType {
+  return Boolean(value && value in MOVEMENT_TYPE_LABELS);
+}
+
+function isDirection(value: string | null): value is StatementDirection {
+  return value === "credit" || value === "debit";
+}
+
+function resultCountText(totalCount: number) {
+  if (totalCount === 0) return "Nenhuma movimentação encontrada";
+  if (totalCount === 1) return "1 movimentação encontrada";
+
+  return `${totalCount} movimentações encontradas`;
+}
+
 export default function AccountStatementPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -87,30 +121,35 @@ export default function AccountStatementPage() {
   const [periodError, setPeriodError] = useState<string | null>(null);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [appliedStartDate, setAppliedStartDate] = useState("");
-  const [appliedEndDate, setAppliedEndDate] = useState("");
+  const [movementType, setMovementType] = useState<StatementMovementType | "">("");
+  const [direction, setDirection] = useState<StatementDirection | "">("");
+  const [appliedFilters, setAppliedFilters] = useState<StatementFilters>({
+    startDate: "",
+    endDate: "",
+    movementType: "",
+    direction: "",
+    page: 1,
+  });
 
   const handleUnauthorized = useCallback(() => router.replace("/login"), [router]);
 
-  const updateUrl = useCallback((nextStartDate: string, nextEndDate: string, nextPage: number) => {
+  const updateUrl = useCallback((filters: StatementFilters) => {
     const searchParams = new URLSearchParams();
-    if (nextStartDate) searchParams.set("start_date", nextStartDate);
-    if (nextEndDate) searchParams.set("end_date", nextEndDate);
-    if (nextPage > 1) searchParams.set("page", String(nextPage));
+    if (filters.startDate) searchParams.set("start_date", filters.startDate);
+    if (filters.endDate) searchParams.set("end_date", filters.endDate);
+    if (filters.movementType) searchParams.set("movement_type", filters.movementType);
+    if (filters.direction) searchParams.set("direction", filters.direction);
+    if (filters.page > 1) searchParams.set("page", String(filters.page));
 
     const query = searchParams.toString();
     router.push(`/accounts/${accountId}${query ? `?${query}` : ""}`);
   }, [accountId, router]);
 
   const loadStatement = useCallback(async ({
-    nextStartDate,
-    nextEndDate,
-    nextPage,
+    filters,
     signal,
   }: {
-    nextStartDate: string;
-    nextEndDate: string;
-    nextPage: number;
+    filters: StatementFilters;
     signal?: AbortSignal;
   }) => {
     if (!Number.isFinite(accountId) || accountId <= 0) {
@@ -123,9 +162,11 @@ export default function AccountStatementPage() {
       setLoading(true);
       setError(null);
       const result = await fetchAccountStatement(accountId, {
-        startDate: nextStartDate || undefined,
-        endDate: nextEndDate || undefined,
-        page: nextPage,
+        startDate: filters.startDate || undefined,
+        endDate: filters.endDate || undefined,
+        movementType: filters.movementType || undefined,
+        direction: filters.direction || undefined,
+        page: filters.page,
         perPage: 25,
         signal,
       });
@@ -141,10 +182,11 @@ export default function AccountStatementPage() {
       }
 
       setStatement(result.data);
-      setAppliedStartDate(nextStartDate);
-      setAppliedEndDate(nextEndDate);
-      setStartDate(result.data.period.start_date ?? nextStartDate);
-      setEndDate(result.data.period.end_date ?? nextEndDate);
+      setAppliedFilters(filters);
+      setStartDate(result.data.period.start_date ?? filters.startDate);
+      setEndDate(result.data.period.end_date ?? filters.endDate);
+      setMovementType(result.data.filters.movement_type ?? filters.movementType);
+      setDirection(result.data.filters.direction ?? filters.direction);
     } catch (err) {
       if (!(err instanceof DOMException && err.name === "AbortError")) {
         console.error(err);
@@ -162,28 +204,27 @@ export default function AccountStatementPage() {
   useEffect(() => {
     if (auth.status !== "authenticated") return;
 
-    const searchParams = new URLSearchParams(window.location.search);
-    const initialStartDate = searchParams.get("start_date") ?? "";
-    const initialEndDate = searchParams.get("end_date") ?? "";
-    const initialPage = Math.max(Number(searchParams.get("page") ?? "1"), 1);
+    const initialFilters = readFiltersFromUrl();
     const controller = new AbortController();
 
-    setStartDate(initialStartDate);
-    setEndDate(initialEndDate);
-    setAppliedStartDate(initialStartDate);
-    setAppliedEndDate(initialEndDate);
+    setStartDate(initialFilters.startDate);
+    setEndDate(initialFilters.endDate);
+    setMovementType(initialFilters.movementType);
+    setDirection(initialFilters.direction);
+    setAppliedFilters(initialFilters);
 
-    void loadStatement({
-      nextStartDate: initialStartDate,
-      nextEndDate: initialEndDate,
-      nextPage: initialPage,
-      signal: controller.signal,
-    });
+    void loadStatement({ filters: initialFilters, signal: controller.signal });
 
     return () => controller.abort();
   }, [auth.status, loadStatement]);
 
-  function handleApplyPeriod(event: React.FormEvent) {
+  function applyFilters(nextFilters: StatementFilters) {
+    setPeriodError(null);
+    updateUrl(nextFilters);
+    void loadStatement({ filters: nextFilters });
+  }
+
+  function handleApplyFilters(event: React.FormEvent) {
     event.preventDefault();
     setPeriodError(null);
 
@@ -192,21 +233,89 @@ export default function AccountStatementPage() {
       return;
     }
 
-    updateUrl(startDate, endDate, 1);
-    void loadStatement({ nextStartDate: startDate, nextEndDate: endDate, nextPage: 1 });
+    applyFilters({
+      startDate,
+      endDate,
+      movementType,
+      direction,
+      page: 1,
+    });
   }
 
-  function handleClearPeriod() {
+  function handleMovementTypeChange(value: string) {
+    const nextMovementType = isMovementType(value) ? value : "";
+    setMovementType(nextMovementType);
+    applyFilters({
+      startDate,
+      endDate,
+      movementType: nextMovementType,
+      direction,
+      page: 1,
+    });
+  }
+
+  function handleDirectionChange(value: string) {
+    const nextDirection = isDirection(value) ? value : "";
+    setDirection(nextDirection);
+    applyFilters({
+      startDate,
+      endDate,
+      movementType,
+      direction: nextDirection,
+      page: 1,
+    });
+  }
+
+  function handleClearFilters() {
     setPeriodError(null);
     setStartDate("");
     setEndDate("");
-    updateUrl("", "", 1);
-    void loadStatement({ nextStartDate: "", nextEndDate: "", nextPage: 1 });
+    setMovementType("");
+    setDirection("");
+    applyFilters({
+      startDate: "",
+      endDate: "",
+      movementType: "",
+      direction: "",
+      page: 1,
+    });
+  }
+
+  function handleRemovePeriodFilter() {
+    setStartDate("");
+    setEndDate("");
+    applyFilters({
+      startDate: "",
+      endDate: "",
+      movementType: appliedFilters.movementType,
+      direction: appliedFilters.direction,
+      page: 1,
+    });
+  }
+
+  function handleRemoveMovementTypeFilter() {
+    setMovementType("");
+    applyFilters({
+      ...appliedFilters,
+      movementType: "",
+      page: 1,
+    });
+  }
+
+  function handleRemoveDirectionFilter() {
+    setDirection("");
+    applyFilters({
+      ...appliedFilters,
+      direction: "",
+      page: 1,
+    });
   }
 
   function handlePageChange(nextPage: number) {
-    updateUrl(appliedStartDate, appliedEndDate, nextPage);
-    void loadStatement({ nextStartDate: appliedStartDate, nextEndDate: appliedEndDate, nextPage });
+    applyFilters({
+      ...appliedFilters,
+      page: nextPage,
+    });
   }
 
   if (auth.status !== "authenticated") {
@@ -217,6 +326,7 @@ export default function AccountStatementPage() {
   const pagination = statement?.pagination;
   const isArchived = Boolean(account?.archived_at);
   const blockingLoading = loading && !statement;
+  const hasTypeOrDirectionFilters = Boolean(appliedFilters.movementType || appliedFilters.direction);
 
   return (
     <AppLayout>
@@ -240,7 +350,7 @@ export default function AccountStatementPage() {
           <>
             <section className="rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm">
               {loading && !statement ? (
-                        <p className="text-sm text-neutral-500">Carregando extrato...</p>
+                <p className="text-sm text-neutral-500">Carregando extrato...</p>
               ) : account ? (
                 <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                   <div className="flex min-w-0 items-start gap-4">
@@ -276,7 +386,7 @@ export default function AccountStatementPage() {
 
             {statement && (
               <>
-                <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <section className={`grid grid-cols-1 gap-4 md:grid-cols-3 ${loading ? "opacity-75" : ""}`} aria-busy={loading}>
                   <SummaryCard title="Entradas" value={statement.summary.credits_total} tone="credit" />
                   <SummaryCard title="Saídas" value={statement.summary.debits_total} tone="debit" />
                   <SummaryCard title="Variação líquida" value={statement.summary.net_total} tone={Number(statement.summary.net_total) >= 0 ? "credit" : "debit"} />
@@ -285,10 +395,10 @@ export default function AccountStatementPage() {
                 <Card>
                   <CardHeader>
                     <CardTitle>Filtros</CardTitle>
-                    <p className="mt-1 text-sm text-neutral-500">Filtre o extrato por período. Tipo e direção ficam para a próxima fase.</p>
+                    <p className="mt-1 text-sm text-neutral-500">Combine período, tipo e direção. Os filtros são processados pela API.</p>
                   </CardHeader>
                   <CardContent>
-                    <form aria-label="Filtros de período" onSubmit={handleApplyPeriod} className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1fr_auto_auto] lg:items-end">
+                    <form aria-label="Filtros do extrato" onSubmit={handleApplyFilters} className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1fr_1fr_1fr_auto_auto] lg:items-end">
                       <div className="space-y-2">
                         <label className="text-sm font-medium text-neutral-800" htmlFor="start-date">Data inicial</label>
                         <Input
@@ -311,13 +421,49 @@ export default function AccountStatementPage() {
                           className="h-11 rounded-xl"
                         />
                       </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-neutral-800" htmlFor="movement-type">Tipo</label>
+                        <select
+                          id="movement-type"
+                          value={movementType}
+                          onChange={(event) => handleMovementTypeChange(event.target.value)}
+                          disabled={blockingLoading}
+                          className="h-11 w-full rounded-xl border border-neutral-200 bg-white px-3 text-sm text-neutral-900 outline-none transition focus:border-neutral-400 focus:ring-2 focus:ring-neutral-100"
+                        >
+                          {MOVEMENT_TYPE_OPTIONS.map((option) => (
+                            <option key={option.value || "all"} value={option.value}>{option.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-neutral-800" htmlFor="direction">Direção</label>
+                        <select
+                          id="direction"
+                          value={direction}
+                          onChange={(event) => handleDirectionChange(event.target.value)}
+                          disabled={blockingLoading}
+                          className="h-11 w-full rounded-xl border border-neutral-200 bg-white px-3 text-sm text-neutral-900 outline-none transition focus:border-neutral-400 focus:ring-2 focus:ring-neutral-100"
+                        >
+                          {DIRECTION_OPTIONS.map((option) => (
+                            <option key={option.value || "all"} value={option.value}>{option.label}</option>
+                          ))}
+                        </select>
+                      </div>
                       <Button type="submit" disabled={blockingLoading} className="h-11 rounded-xl bg-neutral-900 text-white">
                         {loading ? "Aplicando..." : "Aplicar"}
                       </Button>
-                      <Button type="button" variant="outline" disabled={blockingLoading} onClick={handleClearPeriod} className="h-11 rounded-xl">
-                        Limpar
+                      <Button type="button" variant="outline" disabled={blockingLoading} onClick={handleClearFilters} className="h-11 rounded-xl">
+                        Limpar filtros
                       </Button>
                     </form>
+
+                    <ActiveFilters
+                      filters={appliedFilters}
+                      onRemovePeriod={handleRemovePeriodFilter}
+                      onRemoveMovementType={handleRemoveMovementTypeFilter}
+                      onRemoveDirection={handleRemoveDirectionFilter}
+                    />
+
                     {periodError && <p className="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{periodError}</p>}
                     {error && statement && <p className="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}
                   </CardContent>
@@ -330,15 +476,25 @@ export default function AccountStatementPage() {
                       <p className="mt-1 text-sm text-neutral-500">
                         Movimentação patrimonial da conta. Não é o dashboard por competência.
                       </p>
+                      <p className="mt-2 text-sm font-medium text-neutral-700">
+                        {resultCountText(statement.pagination.total_count)}
+                      </p>
                     </div>
-                    {loading && statement && <span className="text-sm text-neutral-500">Atualizando...</span>}
+                    {loading && statement && <span className="text-sm text-neutral-500" role="status">Atualizando...</span>}
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className={loading ? "opacity-75" : ""} aria-busy={loading}>
                     {statement.items.length === 0 ? (
                       <div className="rounded-2xl border border-dashed border-neutral-200 bg-neutral-50 px-6 py-10 text-center">
                         <CalendarDays className="mx-auto mb-4 h-10 w-10 text-neutral-300" />
-                        <h2 className="text-lg font-semibold text-neutral-950">Nenhuma movimentação encontrada neste período.</h2>
-                        <p className="mt-2 text-sm text-neutral-500">Tente ajustar o período selecionado.</p>
+                        <h2 className="text-lg font-semibold text-neutral-950">
+                          {hasTypeOrDirectionFilters ? "Nenhuma movimentação corresponde aos filtros selecionados." : "Nenhuma movimentação encontrada neste período."}
+                        </h2>
+                        <p className="mt-2 text-sm text-neutral-500">
+                          {hasTypeOrDirectionFilters ? "Tente remover tipo ou direção para ampliar a consulta." : "Tente ajustar o período selecionado."}
+                        </p>
+                        <Button type="button" variant="outline" className="mt-5 rounded-xl" onClick={handleClearFilters}>
+                          Limpar filtros
+                        </Button>
                       </div>
                     ) : (
                       <div className="space-y-3">
@@ -351,7 +507,7 @@ export default function AccountStatementPage() {
                     {pagination && (
                       <div className="mt-5 flex flex-col gap-3 border-t border-neutral-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
                         <p className="text-sm text-neutral-500">
-                          Página {pagination.page} de {Math.max(pagination.total_pages, 1)} · {pagination.total_count} movimentações
+                          Página {pagination.page} de {Math.max(pagination.total_pages, 1)} · {resultCountText(pagination.total_count)}
                         </p>
                         <div className="flex gap-2">
                           <Button
@@ -384,6 +540,58 @@ export default function AccountStatementPage() {
   );
 }
 
+function ActiveFilters({
+  filters,
+  onRemovePeriod,
+  onRemoveMovementType,
+  onRemoveDirection,
+}: {
+  filters: StatementFilters;
+  onRemovePeriod: () => void;
+  onRemoveMovementType: () => void;
+  onRemoveDirection: () => void;
+}) {
+  const hasPeriod = Boolean(filters.startDate || filters.endDate);
+  const hasAnyFilter = hasPeriod || filters.movementType || filters.direction;
+
+  if (!hasAnyFilter) return null;
+
+  return (
+    <div className="mt-4 flex flex-wrap items-center gap-2" aria-label="Filtros ativos">
+      <span className="text-sm font-medium text-neutral-600">Filtros ativos:</span>
+      {hasPeriod && (
+        <FilterChip onRemove={onRemovePeriod}>
+          Período: {filters.startDate ? formatDateBR(filters.startDate) : "início"} a {filters.endDate ? formatDateBR(filters.endDate) : "fim"}
+        </FilterChip>
+      )}
+      {filters.movementType && (
+        <FilterChip onRemove={onRemoveMovementType}>
+          Tipo: {MOVEMENT_TYPE_LABELS[filters.movementType]}
+        </FilterChip>
+      )}
+      {filters.direction && (
+        <FilterChip onRemove={onRemoveDirection}>
+          Direção: {DIRECTION_LABELS[filters.direction]}
+        </FilterChip>
+      )}
+    </div>
+  );
+}
+
+function FilterChip({ children, onRemove }: { children: React.ReactNode; onRemove: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onRemove}
+      className="rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1 text-left text-xs font-medium text-neutral-700 transition hover:border-neutral-300 hover:bg-white focus:outline-none focus:ring-2 focus:ring-neutral-200"
+      aria-label={`Remover filtro ${String(children)}`}
+    >
+      {children}
+      <span aria-hidden="true" className="ml-2 text-neutral-400">×</span>
+    </button>
+  );
+}
+
 function SummaryCard({ title, value, tone }: { title: string; value: string; tone: "credit" | "debit" }) {
   return (
     <Card>
@@ -401,29 +609,29 @@ function SummaryCard({ title, value, tone }: { title: string; value: string; ton
 
 function StatementItemCard({ item }: { item: StatementEntry }) {
   const credit = item.direction === "credit";
+  const Icon = MOVEMENT_TYPE_ICONS[item.movement_type];
 
   return (
     <article className="rounded-2xl border border-neutral-200 p-4 transition hover:bg-neutral-50">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className={`inline-flex h-9 w-9 items-center justify-center rounded-xl ${credit ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}>
-              {iconForMovement(item)}
+          <div className="flex items-start gap-3">
+            <span className={`mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${credit ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}>
+              <Icon className="h-4 w-4" />
             </span>
             <div className="min-w-0">
-              <h2 className="truncate font-semibold text-neutral-950">{item.title}</h2>
-              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-neutral-500">
-                <span className={`rounded-full px-2 py-0.5 font-semibold ${credit ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}>
-                  {movementLabels[item.movement_type]}
-                </span>
-                <span>{credit ? "Crédito" : "Débito"}</span>
+              <h2 className="font-semibold text-neutral-950">{item.title}</h2>
+              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-neutral-500">
+                <span className="font-semibold text-neutral-700">{MOVEMENT_TYPE_LABELS[item.movement_type]}</span>
+                <span aria-hidden="true">•</span>
                 <span>{formatDateBR(item.occurred_on)}</span>
+                <span aria-hidden="true">•</span>
+                <span>{credit ? "Crédito" : "Débito"}</span>
               </div>
+              {safeText(item.description) && <p className="mt-3 text-sm text-neutral-700">{safeText(item.description)}</p>}
+              <MetadataLine item={item} />
             </div>
           </div>
-
-          {item.description && <p className="mt-3 text-sm text-neutral-700">{item.description}</p>}
-          <MetadataLine item={item} />
         </div>
 
         <p className={`text-lg font-bold tabular-nums sm:text-xl ${credit ? "text-emerald-600" : "text-rose-600"}`}>
@@ -435,27 +643,57 @@ function StatementItemCard({ item }: { item: StatementEntry }) {
 }
 
 function MetadataLine({ item }: { item: StatementEntry }) {
-  const parts: string[] = [];
-
-  if (item.metadata.category?.name) parts.push(`Categoria: ${item.metadata.category.name}`);
-  if (item.metadata.source) parts.push(`Origem: ${sourceLabels[item.metadata.source] ?? item.metadata.source}`);
-  if (item.metadata.card?.name) parts.push(`Cartão: ${item.metadata.card.name}`);
-  if (item.metadata.billing_statement) parts.push(`Fatura: ${formatDateBR(item.metadata.billing_statement)}`);
-  if (item.metadata.counterparty_account?.name) parts.push(`Contraparte: ${item.metadata.counterparty_account.name}`);
-  if (item.metadata.note) parts.push(`Obs.: ${item.metadata.note}`);
+  const parts = metadataPartsFor(item);
 
   if (parts.length === 0) return null;
 
-  return <p className="mt-3 text-sm text-neutral-500">{parts.join(" · ")}</p>;
+  return (
+    <dl className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-neutral-500">
+      {parts.map((part) => (
+        <div key={`${part.label}-${part.value}`} className="flex gap-1">
+          <dt>{part.label}:</dt>
+          <dd className="font-medium text-neutral-600">{part.value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
 }
 
-function iconForMovement(item: StatementEntry) {
-  if (item.movement_type === "card_statement_payment") return <CreditCard className="h-4 w-4" />;
-  if (item.movement_type === "transfer_in" || item.movement_type === "transfer_out") return <RefreshCcw className="h-4 w-4" />;
-  if (item.movement_type === "initial_balance") return <Landmark className="h-4 w-4" />;
-  if (item.direction === "credit") return <ArrowDownLeft className="h-4 w-4" />;
+function metadataPartsFor(item: StatementEntry) {
+  const metadata = item.metadata ?? {};
+  const parts: Array<{ label: string; value: string }> = [];
+  const categoryName = safeText(metadata.category?.name);
+  const source = safeText(metadata.source);
+  const cardName = safeText(metadata.card?.name);
+  const billingStatement = safeText(metadata.billing_statement);
+  const counterpartyAccountName = safeText(metadata.counterparty_account?.name);
+  const note = safeText(metadata.note);
 
-  return <ArrowUpRight className="h-4 w-4" />;
+  if (item.movement_type === "income" || item.movement_type === "expense") {
+    if (categoryName) parts.push({ label: "Categoria", value: categoryName });
+    if (source) parts.push({ label: "Origem", value: sourceLabels[source] ?? source });
+  }
+
+  if (item.movement_type === "card_statement_payment") {
+    if (cardName) parts.push({ label: "Cartão", value: cardName });
+    if (billingStatement) parts.push({ label: "Fatura", value: formatDateBR(billingStatement) });
+  }
+
+  if (item.movement_type === "transfer_in" || item.movement_type === "transfer_out") {
+    if (counterpartyAccountName) parts.push({ label: item.movement_type === "transfer_in" ? "Origem" : "Destino", value: counterpartyAccountName });
+    if (note) parts.push({ label: "Obs.", value: note });
+  }
+
+  return parts;
+}
+
+function safeText(value: unknown) {
+  if (typeof value !== "string") return "";
+  const trimmed = value.trim();
+
+  if (!trimmed || trimmed === "undefined" || trimmed === "null" || trimmed === "[object Object]") return "";
+
+  return trimmed;
 }
 
 function balanceTextClass(value: number) {

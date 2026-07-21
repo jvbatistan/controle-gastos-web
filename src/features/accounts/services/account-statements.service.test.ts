@@ -54,21 +54,41 @@ describe("account statement service", () => {
     expect(result).toEqual({ status: 200, data: statement });
   });
 
-  it("maps period and pagination params to the backend contract", async () => {
+  it("maps period, movement type, direction and pagination params to the backend contract", async () => {
     apiMock.mockResolvedValueOnce(statement);
     const controller = new AbortController();
 
     await fetchAccountStatement(7, {
       startDate: "2026-07-01",
       endDate: "2026-07-31",
+      movementType: "transfer_out",
+      direction: "debit",
       page: 2,
       perPage: 10,
       signal: controller.signal,
     });
 
-    expect(apiMock).toHaveBeenCalledWith("/api/accounts/7/statement?start_date=2026-07-01&end_date=2026-07-31&page=2&per_page=10", {
+    expect(apiMock).toHaveBeenCalledWith("/api/accounts/7/statement?start_date=2026-07-01&end_date=2026-07-31&movement_type=transfer_out&direction=debit&page=2&per_page=10", {
       cache: "no-store",
       signal: controller.signal,
+    });
+  });
+
+  it("does not send empty optional params", async () => {
+    apiMock.mockResolvedValueOnce(statement);
+
+    await fetchAccountStatement(1, {
+      startDate: "",
+      endDate: "",
+      movementType: undefined,
+      direction: undefined,
+      page: undefined,
+      perPage: undefined,
+    });
+
+    expect(apiMock).toHaveBeenCalledWith("/api/accounts/1/statement", {
+      cache: "no-store",
+      signal: undefined,
     });
   });
 
