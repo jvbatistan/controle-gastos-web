@@ -28,6 +28,10 @@ const statement = {
     debits_total: "1200.0",
     net_total: "1800.0",
   },
+  balances: {
+    opening_balance: "1000.0",
+    closing_balance: "2800.0",
+  },
   pagination: {
     page: 1,
     per_page: 25,
@@ -52,6 +56,10 @@ describe("account statement service", () => {
       signal: undefined,
     });
     expect(result).toEqual({ status: 200, data: statement });
+    expect(result.data?.balances).toEqual({
+      opening_balance: "1000.0",
+      closing_balance: "2800.0",
+    });
   });
 
   it("maps period, movement type, direction and pagination params to the backend contract", async () => {

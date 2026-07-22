@@ -58,6 +58,10 @@ const statement = {
     debits_total: "1200.0",
     net_total: "1800.0",
   },
+  balances: {
+    opening_balance: "1000.0",
+    closing_balance: "2800.0",
+  },
   pagination: {
     page: 1,
     per_page: 25,
@@ -191,10 +195,16 @@ describe("AccountStatementPage", () => {
     expect(screen.getByText("R$ 1.500,00")).toBeInTheDocument();
     expect(screen.getAllByText("Entradas").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Saídas").length).toBeGreaterThan(0);
-    expect(screen.getByText("Variação líquida")).toBeInTheDocument();
-    expect(screen.getByText("R$ 3.000,00")).toBeInTheDocument();
-    expect(screen.getByText("R$ 1.200,00")).toBeInTheDocument();
-    expect(screen.getByText("R$ 1.800,00")).toBeInTheDocument();
+    expect(screen.getAllByText("Variação líquida").length).toBeGreaterThan(0);
+    expect(screen.getByRole("heading", { name: "Saldos do período" })).toBeInTheDocument();
+    expect(screen.getByText("Posição patrimonial calculada pela API para o período selecionado.")).toBeInTheDocument();
+    expect(screen.getByText("Saldo de abertura")).toBeInTheDocument();
+    expect(screen.getByText("Saldo de fechamento")).toBeInTheDocument();
+    expect(screen.getAllByText("R$ 3.000,00").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("R$ 1.200,00").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("R$ 1.800,00").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("R$ 1.000,00").length).toBeGreaterThan(0);
+    expect(screen.getByText("R$ 2.800,00")).toBeInTheDocument();
     expect(screen.getAllByText("6 movimentações encontradas").length).toBeGreaterThan(0);
 
     expect(screen.getAllByText("Saldo inicial").length).toBeGreaterThan(0);
@@ -298,9 +308,9 @@ describe("AccountStatementPage", () => {
     expect(await screen.findByText("1 movimentação encontrada")).toBeInTheDocument();
     expect(screen.getByText("Tipo: Transferência enviada")).toBeInTheDocument();
     expect(screen.getByText("Direção: Saída")).toBeInTheDocument();
-    expect(screen.getByText("R$ 0,00")).toBeInTheDocument();
-    expect(screen.getByText("R$ 300,00")).toBeInTheDocument();
-    expect(screen.getByText("-R$ 300,00")).toBeInTheDocument();
+    expect(screen.getAllByText("R$ 0,00").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("R$ 300,00").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("-R$ 300,00").length).toBeGreaterThan(0);
   });
 
   it("reads filters from query params on initial load", async () => {
@@ -417,6 +427,67 @@ describe("AccountStatementPage", () => {
     expect(await screen.findByText("Nenhuma movimentação encontrada")).toBeInTheDocument();
     expect(screen.getByText("Nenhuma movimentação encontrada neste período.")).toBeInTheDocument();
     expect(screen.getByText("Tente ajustar o período selecionado.")).toBeInTheDocument();
+    expect(screen.getByText("Saldo de abertura")).toBeInTheDocument();
+    expect(screen.getByText("Saldo de fechamento")).toBeInTheDocument();
+    expect(screen.getByText("R$ 2.800,00")).toBeInTheDocument();
+  });
+
+  it("keeps period balances visible with zero movements and zero values", async () => {
+    fetchAccountStatement.mockResolvedValueOnce({
+      status: 200,
+      data: {
+        ...statement,
+        account: {
+          ...statement.account,
+          current_balance: "500.0",
+        },
+        summary: {
+          credits_total: "0.0",
+          debits_total: "0.0",
+          net_total: "0.0",
+        },
+        balances: {
+          opening_balance: "1300.0",
+          closing_balance: "1300.0",
+        },
+        items: [],
+        pagination: { page: 1, per_page: 25, total_count: 0, total_pages: 0 },
+      },
+    });
+
+    render(<AccountStatementPage />);
+
+    expect(await screen.findByText("Nenhuma movimentação encontrada")).toBeInTheDocument();
+    expect(screen.getByText("Saldo atual")).toBeInTheDocument();
+    expect(screen.getByText("R$ 500,00")).toBeInTheDocument();
+    expect(screen.getByText("Saldo de abertura")).toBeInTheDocument();
+    expect(screen.getByText("Saldo de fechamento")).toBeInTheDocument();
+    expect(screen.getAllByText("R$ 0,00").length).toBeGreaterThanOrEqual(3);
+    expect(screen.getAllByText("R$ 1.300,00").length).toBe(2);
+  });
+
+  it("renders opening and closing balances independently from current balance", async () => {
+    fetchAccountStatement.mockResolvedValueOnce({
+      status: 200,
+      data: {
+        ...statement,
+        account: {
+          ...statement.account,
+          current_balance: "9999.0",
+        },
+        balances: {
+          opening_balance: "700.0",
+          closing_balance: "2500.0",
+        },
+      },
+    });
+
+    render(<AccountStatementPage />);
+
+    expect(await screen.findByText("Saldo atual")).toBeInTheDocument();
+    expect(screen.getByText("R$ 9.999,00")).toBeInTheDocument();
+    expect(screen.getByText("R$ 700,00")).toBeInTheDocument();
+    expect(screen.getByText("R$ 2.500,00")).toBeInTheDocument();
   });
 
   it("shows filtered empty state", async () => {

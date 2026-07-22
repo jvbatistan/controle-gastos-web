@@ -35,6 +35,11 @@ export type StatementEntry = {
   created_at?: string;
 };
 
+export type AccountStatementBalances = {
+  opening_balance: string;
+  closing_balance: string;
+};
+
 export type AccountStatementResponse = {
   account: {
     id: number;
@@ -60,6 +65,7 @@ export type AccountStatementResponse = {
     debits_total: string;
     net_total: string;
   };
+  balances: AccountStatementBalances;
   pagination: {
     page: number;
     per_page: number;

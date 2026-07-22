@@ -392,6 +392,22 @@ export default function AccountStatementPage() {
                   <SummaryCard title="Variação líquida" value={statement.summary.net_total} tone={Number(statement.summary.net_total) >= 0 ? "credit" : "debit"} />
                 </section>
 
+                <section aria-labelledby="period-balances-title" className={`space-y-3 ${loading ? "opacity-75" : ""}`} aria-busy={loading}>
+                  <div>
+                    <h2 id="period-balances-title" className="text-lg font-semibold text-neutral-950">Saldos do período</h2>
+                    <p className="mt-1 text-sm text-neutral-500">
+                      Posição patrimonial calculada pela API para o período selecionado.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+                    <SummaryCard title="Saldo de abertura" value={statement.balances.opening_balance} tone={Number(statement.balances.opening_balance) >= 0 ? "credit" : "debit"} />
+                    <SummaryCard title="Entradas" value={statement.summary.credits_total} tone="credit" />
+                    <SummaryCard title="Saídas" value={statement.summary.debits_total} tone="debit" />
+                    <SummaryCard title="Variação líquida" value={statement.summary.net_total} tone={Number(statement.summary.net_total) >= 0 ? "credit" : "debit"} />
+                    <SummaryCard title="Saldo de fechamento" value={statement.balances.closing_balance} tone={Number(statement.balances.closing_balance) >= 0 ? "credit" : "debit"} />
+                  </div>
+                </section>
+
                 <Card>
                   <CardHeader>
                     <CardTitle>Filtros</CardTitle>
