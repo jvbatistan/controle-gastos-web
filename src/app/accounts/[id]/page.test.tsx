@@ -6,6 +6,7 @@ const push = vi.fn();
 const replace = vi.fn();
 const routerMock = { push, replace };
 const fetchAccountStatement = vi.fn();
+const exportAccountStatementCsv = vi.fn();
 const useAuth = vi.fn();
 const useParams = vi.fn();
 
@@ -32,6 +33,7 @@ vi.mock("@/features/accounts", async (importOriginal) => {
   return {
     ...actual,
     fetchAccountStatement: (...args: unknown[]) => fetchAccountStatement(...args),
+    exportAccountStatementCsv: (...args: unknown[]) => exportAccountStatementCsv(...args),
   };
 });
 
@@ -171,9 +173,27 @@ const filteredStatement = {
 };
 
 beforeEach(() => {
+  Object.defineProperty(URL, "createObjectURL", {
+    configurable: true,
+    writable: true,
+    value: vi.fn(() => "blob:account-statement-csv"),
+  });
+  Object.defineProperty(URL, "revokeObjectURL", {
+    configurable: true,
+    writable: true,
+    value: vi.fn(),
+  });
+
   push.mockReset();
   replace.mockReset();
   fetchAccountStatement.mockReset().mockResolvedValue({ status: 200, data: statement });
+  exportAccountStatementCsv.mockReset().mockResolvedValue({
+    status: 200,
+    data: {
+      blob: new Blob(["csv"], { type: "text/csv" }),
+      filename: "finch-extrato-nubank-2026-07-29.csv",
+    },
+  });
   useAuth.mockReturnValue({
     status: "authenticated",
     user: { id: 1, name: "Joao", email: "joao@example.com", active: true },
@@ -242,6 +262,69 @@ describe("AccountStatementPage", () => {
 
     expect(await screen.findByText("Arquivada")).toBeInTheDocument();
     expect(screen.getByText("Esta conta está arquivada. O extrato está disponível apenas para consulta.")).toBeInTheDocument();
+  });
+
+  it("downloads CSV with the currently applied statement filters", async () => {
+    const user = userEvent.setup();
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+    window.history.pushState({}, "", "/accounts/1?start_date=2026-07-01&end_date=2026-07-31&movement_type=income&direction=credit&page=3");
+
+    render(<AccountStatementPage />);
+
+    await screen.findByRole("heading", { name: "Nubank" });
+    await user.click(screen.getByRole("button", { name: "Exportar CSV" }));
+
+    await waitFor(() => {
+      expect(exportAccountStatementCsv).toHaveBeenCalledWith(1, {
+        startDate: "2026-07-01",
+        endDate: "2026-07-31",
+        movementType: "income",
+        direction: "credit",
+      });
+      expect(URL.createObjectURL).toHaveBeenCalled();
+      expect(click).toHaveBeenCalled();
+      expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:account-statement-csv");
+    });
+  });
+
+  it("shows loading while exporting CSV", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+    let resolveExport: (value: unknown) => void = () => undefined;
+    exportAccountStatementCsv.mockReturnValue(new Promise((resolve) => {
+      resolveExport = resolve;
+    }));
+
+    render(<AccountStatementPage />);
+
+    await screen.findByRole("heading", { name: "Nubank" });
+    await user.click(screen.getByRole("button", { name: "Exportar CSV" }));
+    expect(screen.getByRole("button", { name: "Exportando..." })).toBeDisabled();
+
+    resolveExport({
+      status: 200,
+      data: {
+        blob: new Blob(["csv"], { type: "text/csv" }),
+        filename: "finch-extrato-nubank-2026-07-29.csv",
+      },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Exportar CSV" })).toBeEnabled();
+    });
+  });
+
+  it("preserves the statement and shows an error when CSV export fails", async () => {
+    const user = userEvent.setup();
+    exportAccountStatementCsv.mockRejectedValue(new Error("boom"));
+
+    render(<AccountStatementPage />);
+
+    expect(await screen.findByRole("heading", { name: "Nubank" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Exportar CSV" }));
+
+    expect(await screen.findByText("Não foi possível exportar o extrato. Tente novamente.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Nubank" })).toBeInTheDocument();
   });
 
   it("applies period filters, resets to page one and updates the URL", async () => {

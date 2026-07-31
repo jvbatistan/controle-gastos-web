@@ -1,6 +1,6 @@
 export { useAccounts } from "./hooks/useAccounts";
 export { DIRECTION_LABELS, DIRECTION_OPTIONS, MOVEMENT_TYPE_ICONS, MOVEMENT_TYPE_LABELS, MOVEMENT_TYPE_OPTIONS } from "./account-statement.constants";
-export { fetchAccountStatement } from "./services/account-statements.service";
+export { exportAccountStatementCsv, fetchAccountStatement } from "./services/account-statements.service";
 export { createAccountTransfer, fetchAccountTransfers, reverseAccountTransfer } from "./services/account-transfers.service";
 export { archiveAccount, createAccount, fetchAccounts, restoreAccount, updateAccount } from "./services/accounts.service";
 export type { AccountStatementResponse, StatementDirection, StatementEntry, StatementMovementType } from "./types/account-statement.types";

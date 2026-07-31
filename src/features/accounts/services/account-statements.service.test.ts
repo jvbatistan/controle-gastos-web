@@ -1,4 +1,4 @@
-import { fetchAccountStatement } from "@/features/accounts/services/account-statements.service";
+import { exportAccountStatementCsv, fetchAccountStatement } from "@/features/accounts/services/account-statements.service";
 import { api } from "@/lib/api";
 
 vi.mock("@/lib/api", () => ({
@@ -110,5 +110,37 @@ describe("account statement service", () => {
     apiMock.mockRejectedValueOnce(new Error("HTTP 401"));
 
     await expect(fetchAccountStatement(1)).resolves.toEqual({ status: 401, data: null });
+  });
+
+  it("exports CSV with statement filters and ignores pagination params", async () => {
+    const blob = new Blob(["csv"], { type: "text/csv" });
+    const fetchMock = vi.spyOn(global, "fetch").mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      blob: vi.fn().mockResolvedValue(blob),
+      headers: new Headers({
+        "Content-Disposition": 'attachment; filename="finch-extrato-nubank-2026-07-29.csv"',
+      }),
+    } as Response);
+
+    const result = await exportAccountStatementCsv(7, {
+      startDate: "2026-07-01",
+      endDate: "2026-07-31",
+      movementType: "income",
+      direction: "credit",
+      page: 9,
+      perPage: 1,
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/accounts/7/statement/export_csv?start_date=2026-07-01&end_date=2026-07-31&movement_type=income&direction=credit",
+      {
+        method: "GET",
+        cache: "no-store",
+        credentials: "include",
+      }
+    );
+    expect(result.status).toBe(200);
+    expect(result.data?.filename).toBe("finch-extrato-nubank-2026-07-29.csv");
   });
 });

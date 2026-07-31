@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, CalendarDays, Wallet } from "lucide-react";
+import { ArrowLeft, CalendarDays, Download, Wallet } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +14,7 @@ import {
   MOVEMENT_TYPE_ICONS,
   MOVEMENT_TYPE_LABELS,
   MOVEMENT_TYPE_OPTIONS,
+  exportAccountStatementCsv,
   fetchAccountStatement,
   type AccountKind,
   type AccountStatementResponse,
@@ -119,6 +120,8 @@ export default function AccountStatementPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [periodError, setPeriodError] = useState<string | null>(null);
+  const [exportingCsv, setExportingCsv] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [movementType, setMovementType] = useState<StatementMovementType | "">("");
@@ -318,6 +321,43 @@ export default function AccountStatementPage() {
     });
   }
 
+  async function handleExportCsv() {
+    try {
+      setExportingCsv(true);
+      setExportError(null);
+      const result = await exportAccountStatementCsv(accountId, {
+        startDate: appliedFilters.startDate || undefined,
+        endDate: appliedFilters.endDate || undefined,
+        movementType: appliedFilters.movementType || undefined,
+        direction: appliedFilters.direction || undefined,
+      });
+
+      if (result.status === 401) {
+        handleUnauthorized();
+        return;
+      }
+
+      if (!result.data) {
+        setExportError("Não foi possível exportar o extrato.");
+        return;
+      }
+
+      const url = URL.createObjectURL(result.data.blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = result.data.filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      setExportError("Não foi possível exportar o extrato. Tente novamente.");
+    } finally {
+      setExportingCsv(false);
+    }
+  }
+
   if (auth.status !== "authenticated") {
     return <div className="min-h-screen bg-neutral-50" />;
   }
@@ -373,16 +413,33 @@ export default function AccountStatementPage() {
                     </div>
                   </div>
 
-                  <div className="rounded-2xl bg-neutral-50 p-4 text-left lg:min-w-64">
-                    <p className="text-sm text-neutral-500">Saldo atual</p>
-                    <p className={`mt-1 text-3xl font-bold tabular-nums ${balanceTextClass(Number(account.current_balance))}`}>
-                      {formatBRL(account.current_balance)}
-                    </p>
-                    <p className="mt-1 text-xs text-neutral-500">Calculado pela API de Accounts</p>
+                  <div className="flex flex-col items-start gap-3 lg:items-end">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleExportCsv}
+                      disabled={exportingCsv || loading}
+                    >
+                      <Download className="mr-2 h-4 w-4" />
+                      {exportingCsv ? "Exportando..." : "Exportar CSV"}
+                    </Button>
+                    <div className="rounded-2xl bg-neutral-50 p-4 text-left lg:min-w-64">
+                      <p className="text-sm text-neutral-500">Saldo atual</p>
+                      <p className={`mt-1 text-3xl font-bold tabular-nums ${balanceTextClass(Number(account.current_balance))}`}>
+                        {formatBRL(account.current_balance)}
+                      </p>
+                      <p className="mt-1 text-xs text-neutral-500">Calculado pela API de Accounts</p>
+                    </div>
                   </div>
                 </div>
               ) : null}
             </section>
+
+            {exportError && (
+              <p className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                {exportError}
+              </p>
+            )}
 
             {statement && (
               <>
