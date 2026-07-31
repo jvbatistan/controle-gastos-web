@@ -7,3 +7,36 @@ body {
   max-width: 100%;
   overflow-x: hidden;
 }
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 16mm;
+  }
+
+  .print-controls {
+    display: none !important;
+  }
+
+  .statement-print-document {
+    color: #171717;
+    font-size: 11pt;
+  }
+
+  .statement-print-document table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .statement-print-document thead {
+    display: table-header-group;
+  }
+
+  .statement-print-document tr {
+    break-inside: avoid;
+  }
+
+  .statement-print-document a {
+    text-decoration: none;
+  }
+}

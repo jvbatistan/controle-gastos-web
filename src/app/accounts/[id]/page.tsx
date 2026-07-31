@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, CalendarDays, Download, Wallet } from "lucide-react";
+import { ArrowLeft, CalendarDays, Download, Printer, Wallet } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -321,6 +321,17 @@ export default function AccountStatementPage() {
     });
   }
 
+  function handlePrintStatement() {
+    const searchParams = new URLSearchParams();
+    if (appliedFilters.startDate) searchParams.set("start_date", appliedFilters.startDate);
+    if (appliedFilters.endDate) searchParams.set("end_date", appliedFilters.endDate);
+    if (appliedFilters.movementType) searchParams.set("movement_type", appliedFilters.movementType);
+    if (appliedFilters.direction) searchParams.set("direction", appliedFilters.direction);
+
+    const query = searchParams.toString();
+    router.push(`/accounts/${accountId}/statement/print${query ? `?${query}` : ""}`);
+  }
+
   async function handleExportCsv() {
     try {
       setExportingCsv(true);
@@ -414,6 +425,15 @@ export default function AccountStatementPage() {
                   </div>
 
                   <div className="flex flex-col items-start gap-3 lg:items-end">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handlePrintStatement}
+                      disabled={loading}
+                    >
+                      <Printer className="mr-2 h-4 w-4" />
+                      Imprimir extrato
+                    </Button>
                     <Button
                       type="button"
                       variant="outline"

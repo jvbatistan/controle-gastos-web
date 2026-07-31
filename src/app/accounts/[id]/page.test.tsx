@@ -287,6 +287,20 @@ describe("AccountStatementPage", () => {
     });
   });
 
+  it("navigates to print with active filters and without pagination", async () => {
+    const user = userEvent.setup();
+    window.history.pushState({}, "", "/accounts/1?start_date=2026-07-01&end_date=2026-07-31&movement_type=income&direction=credit&page=3");
+
+    render(<AccountStatementPage />);
+
+    await screen.findByRole("heading", { name: "Nubank" });
+    await user.click(screen.getByRole("button", { name: "Imprimir extrato" }));
+
+    expect(push).toHaveBeenCalledWith(
+      "/accounts/1/statement/print?start_date=2026-07-01&end_date=2026-07-31&movement_type=income&direction=credit"
+    );
+  });
+
   it("shows loading while exporting CSV", async () => {
     const user = userEvent.setup();
     vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);

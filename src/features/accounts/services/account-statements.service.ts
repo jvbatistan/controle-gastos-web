@@ -33,6 +33,24 @@ export async function fetchAccountStatement(accountId: number, params: FetchAcco
   }
 }
 
+export async function fetchAccountStatementForPrint(accountId: number, params: FetchAccountStatementParams = {}) {
+  const path = `/api/accounts/${accountId}/statement/print${buildStatementQuery(params, false)}`;
+
+  try {
+    const data = (await api(path, {
+      cache: "no-store",
+      signal: params.signal,
+    })) as AccountStatementResponse;
+
+    return { status: 200 as const, data };
+  } catch (err) {
+    if (err instanceof Error && err.message.includes("401")) {
+      return { status: 401 as const, data: null as AccountStatementResponse | null };
+    }
+    throw err;
+  }
+}
+
 function filenameFromContentDisposition(contentDisposition: string | null) {
   if (!contentDisposition) return null;
 

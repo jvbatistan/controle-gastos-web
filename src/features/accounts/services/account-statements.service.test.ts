@@ -1,4 +1,4 @@
-import { exportAccountStatementCsv, fetchAccountStatement } from "@/features/accounts/services/account-statements.service";
+import { exportAccountStatementCsv, fetchAccountStatement, fetchAccountStatementForPrint } from "@/features/accounts/services/account-statements.service";
 import { api } from "@/lib/api";
 
 vi.mock("@/lib/api", () => ({
@@ -98,6 +98,24 @@ describe("account statement service", () => {
       cache: "no-store",
       signal: undefined,
     });
+  });
+
+  it("fetches the complete statement for print without pagination params", async () => {
+    apiMock.mockResolvedValueOnce(statement);
+
+    await fetchAccountStatementForPrint(7, {
+      startDate: "2026-07-01",
+      endDate: "2026-07-31",
+      movementType: "income",
+      direction: "credit",
+      page: 3,
+      perPage: 1,
+    });
+
+    expect(apiMock).toHaveBeenCalledWith(
+      "/api/accounts/7/statement/print?start_date=2026-07-01&end_date=2026-07-31&movement_type=income&direction=credit",
+      { cache: "no-store", signal: undefined }
+    );
   });
 
   it("propagates API errors", async () => {
