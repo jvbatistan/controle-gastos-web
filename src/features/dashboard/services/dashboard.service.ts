@@ -1,9 +1,16 @@
 import { api } from "@/lib/api";
 import type { DashboardOverview } from "@/features/dashboard/types/dashboard.types";
 
-export async function fetchDashboard(signal?: AbortSignal) {
+export type DashboardCompetence = {
+  month: number;
+  year: number;
+};
+
+export async function fetchDashboard(competence?: DashboardCompetence, signal?: AbortSignal) {
+  const query = competence ? `?month=${competence.month}&year=${competence.year}` : "";
+
   try {
-    const data = (await api("/api/dashboard", {
+    const data = (await api(`/api/dashboard${query}`, {
       cache: "no-store",
       signal,
     })) as DashboardOverview;

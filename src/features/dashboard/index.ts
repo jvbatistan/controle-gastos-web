@@ -1,5 +1,5 @@
 export { useDashboard } from "./hooks/useDashboard";
-export { fetchDashboard } from "./services/dashboard.service";
+export { fetchDashboard, type DashboardCompetence } from "./services/dashboard.service";
 export type {
   DashboardOverview,
   DashboardSummary,

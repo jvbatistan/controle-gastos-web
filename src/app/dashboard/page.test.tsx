@@ -1,13 +1,16 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import DashboardPage from "@/app/dashboard/page";
 
 const push = vi.fn();
 const replace = vi.fn();
 const useAuth = vi.fn();
 const useDashboard = vi.fn();
+const useSearchParams = vi.fn();
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push, replace }),
+  useSearchParams: () => useSearchParams(),
 }));
 
 vi.mock("@/lib/useAuth", () => ({
@@ -99,6 +102,7 @@ beforeEach(() => {
     status: "authenticated",
     user: { id: 1, name: "Joao", email: "joao@example.com", active: true },
   });
+  useSearchParams.mockReturnValue(new URLSearchParams("month=4&year=2026"));
   useDashboard.mockReturnValue({
     loading: false,
     error: null,
@@ -121,6 +125,38 @@ describe("DashboardPage", () => {
     expect(screen.getByText("Faturas e cartões")).toBeInTheDocument();
     expect(screen.getByText("Status das despesas")).toBeInTheDocument();
     expect(screen.queryByText("Em construção")).not.toBeInTheDocument();
+    expect(useDashboard).toHaveBeenCalledWith(expect.objectContaining({ competence: { month: 4, year: 2026 } }));
+  });
+
+  it("navigates to the previous and next competence through the URL", async () => {
+    const user = userEvent.setup();
+    render(<DashboardPage />);
+
+    await user.click(screen.getByRole("button", { name: "Mês anterior" }));
+    expect(push).toHaveBeenLastCalledWith("/dashboard?month=3&year=2026");
+
+    await user.click(screen.getByRole("button", { name: "Mês seguinte" }));
+    expect(push).toHaveBeenLastCalledWith("/dashboard?month=5&year=2026");
+  });
+
+  it("preserves a future competence from the URL and identifies it as a projection", () => {
+    const futureDate = new Date();
+    const future = new Date(futureDate.getFullYear(), futureDate.getMonth() + 1, 1);
+    useSearchParams.mockReturnValue(new URLSearchParams(`month=${future.getMonth() + 1}&year=${future.getFullYear()}`));
+    useDashboard.mockReturnValue({
+      loading: false,
+      error: null,
+      overview: {
+        ...dashboardOverview,
+        period: { month: future.getMonth() + 1, year: future.getFullYear(), label: "setembro/2026" },
+      },
+    });
+
+    render(<DashboardPage />);
+
+    expect(useDashboard).toHaveBeenCalledWith(expect.objectContaining({ competence: { month: future.getMonth() + 1, year: future.getFullYear() } }));
+    expect(screen.getByText("Projeção")).toBeInTheDocument();
+    expect(screen.getByText(/Projeção financeira para/)).toBeInTheDocument();
   });
 
   it("explains when the monthly balance is negative", () => {
