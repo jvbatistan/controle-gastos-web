@@ -1,15 +1,16 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import AccountStatementPrintPage from "@/app/accounts/[id]/statement/print/page";
 
 const push = vi.fn();
 const replace = vi.fn();
+const routerMock = { push, replace };
 const fetchAccountStatementForPrint = vi.fn();
 const useAuth = vi.fn();
 const useParams = vi.fn();
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push, replace }),
+  useRouter: () => routerMock,
   useParams: () => useParams(),
 }));
 

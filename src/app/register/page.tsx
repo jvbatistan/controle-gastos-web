@@ -37,6 +37,7 @@ export default function RegisterPage() {
         password: form.password,
         password_confirmation: form.passwordConfirmation,
       });
+      await auth.refresh();
       router.replace("/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Nao foi possivel concluir o cadastro.");

@@ -6,6 +6,7 @@ const push = vi.fn();
 const replace = vi.fn();
 const register = vi.fn();
 const useAuth = vi.fn();
+const refresh = vi.fn();
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push, replace }),
@@ -24,7 +25,8 @@ describe("RegisterPage", () => {
     push.mockReset();
     replace.mockReset();
     register.mockReset();
-    useAuth.mockReturnValue({ status: "unauthenticated" });
+    refresh.mockReset().mockResolvedValue(undefined);
+    useAuth.mockReturnValue({ status: "unauthenticated", refresh });
   });
 
   it("submits registration and redirects to the dashboard", async () => {
@@ -47,6 +49,7 @@ describe("RegisterPage", () => {
         password: "password123",
         password_confirmation: "password123",
       });
+      expect(refresh).toHaveBeenCalledTimes(1);
       expect(replace).toHaveBeenCalledWith("/dashboard");
     });
   });

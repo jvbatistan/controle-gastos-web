@@ -27,6 +27,7 @@ export function Header({ onNewTransactionClick, onMenuClick, fluid = false }: He
 
   async function handleLogout() {
     await logout();
+    auth.setUnauthenticated();
     router.replace("/login");
   }
 

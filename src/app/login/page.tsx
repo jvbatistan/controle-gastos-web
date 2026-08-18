@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { login, me } from "@/lib/auth";
+import { login } from "@/lib/auth";
 import { useAuth } from "@/lib/useAuth";
 
 export default function LoginPage() {
@@ -26,7 +26,7 @@ export default function LoginPage() {
 
     try {
       await login(email, password);
-      await me();
+      await auth.refresh();
       router.replace("/dashboard");
     } catch (err) {
       const message = err instanceof Error ? err.message : "";
