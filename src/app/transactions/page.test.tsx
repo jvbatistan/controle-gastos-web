@@ -16,9 +16,12 @@ const useDeleteTransaction = vi.fn();
 const useCards = vi.fn();
 const useAccounts = vi.fn();
 const useAuth = vi.fn();
+const useSearchParams = vi.fn();
+const usePayments = vi.fn();
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push, replace }),
+  useSearchParams: () => useSearchParams(),
 }));
 
 vi.mock("@/lib/useAuth", () => ({
@@ -48,22 +51,29 @@ vi.mock("@/features/transactions", async () => {
 
   return {
     ...actual,
-    useTransactions: () => useTransactions(),
+    useTransactions: (...args: unknown[]) => useTransactions(...args),
     useCreateTransaction: () => useCreateTransaction(),
     useUpdateTransaction: () => useUpdateTransaction(),
     useDeleteTransaction: () => useDeleteTransaction(),
     exportTransactionsCsv: (...args: unknown[]) => exportTransactionsCsv(...args),
     TransactionStats: () => <div>Stats</div>,
-    TransactionFilters: ({ onChange }: { onChange: (filters: unknown) => void }) => (
-      <button
-        type="button"
-        onClick={() => onChange({ cardId: "7", month: "3", year: "2026", limit: "100" })}
-      >
-        Filters
-      </button>
+    TransactionFilters: ({ filters, onChange }: { filters: { cardId: string; month: string; year: string; page: number; perPage: "25" | "50" | "100" }; onChange: (filters: unknown) => void }) => (
+      <>
+        <button
+          type="button"
+          onClick={() => onChange({ cardId: "7", month: "3", year: "2026", page: filters.page, perPage: "100" })}
+        >
+          Filters
+        </button>
+        <button type="button" onClick={() => onChange({ ...filters, cardId: "7" })}>Filtrar cartão</button>
+      </>
     ),
   };
 });
+
+vi.mock("@/features/payments", () => ({
+  usePayments: () => usePayments(),
+}));
 
 beforeEach(() => {
   Object.defineProperty(URL, "createObjectURL", {
@@ -79,6 +89,7 @@ beforeEach(() => {
 
   push.mockReset();
   replace.mockReset();
+  useSearchParams.mockReturnValue(new URLSearchParams());
   refetch.mockReset().mockResolvedValue(undefined);
   createTransaction.mockReset();
   updateTransaction.mockReset().mockResolvedValue({
@@ -102,6 +113,7 @@ beforeEach(() => {
     accounts: [{ id: 3, name: "Conta Corrente" }],
     error: null,
   });
+  usePayments.mockReturnValue({ overview: null, loading: false, error: null, refetch: vi.fn() });
   useTransactions.mockReturnValue({
     items: [
       {
@@ -119,6 +131,7 @@ beforeEach(() => {
       },
     ],
     loading: false,
+    pagination: { page: 1, per_page: 25, total_count: 1, total_pages: 1 },
     error: null,
     refetch,
   });
@@ -149,6 +162,79 @@ function getFirstActionTrigger() {
 }
 
 describe("TransactionsPage", () => {
+  it("requests the next and previous pages while preserving filters in the URL", async () => {
+    const user = userEvent.setup();
+    useSearchParams.mockReturnValue(new URLSearchParams("card_id=7&month=3&year=2026"));
+    useTransactions.mockReturnValue({
+      ...useTransactions(),
+      pagination: { page: 1, per_page: 25, total_count: 51, total_pages: 3 },
+    });
+
+    render(<TransactionsPage />);
+
+    expect(screen.getByRole("button", { name: "Anterior" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Próxima" }));
+    expect(push).toHaveBeenLastCalledWith("/transactions?card_id=7&month=3&year=2026&page=2");
+
+    useTransactions.mockReturnValue({
+      ...useTransactions(),
+      pagination: { page: 2, per_page: 25, total_count: 51, total_pages: 3 },
+    });
+    useSearchParams.mockReturnValue(new URLSearchParams("card_id=7&month=3&year=2026&page=2"));
+    render(<TransactionsPage />);
+    await user.click(screen.getAllByRole("button", { name: "Anterior" }).at(-1)!);
+    expect(push).toHaveBeenLastCalledWith("/transactions?card_id=7&month=3&year=2026");
+  });
+
+  it("disables the next button on the last page and displays the backend total", () => {
+    useSearchParams.mockReturnValue(new URLSearchParams("page=3"));
+    useTransactions.mockReturnValue({
+      ...useTransactions(),
+      pagination: { page: 3, per_page: 25, total_count: 51, total_pages: 3 },
+    });
+
+    render(<TransactionsPage />);
+
+    expect(screen.getByText("51 transações")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Próxima" })).toBeDisabled();
+  });
+
+  it("keeps the existing empty-state message for an empty collection or a filtered page without results", () => {
+    useTransactions.mockReturnValue({
+      ...useTransactions(),
+      items: [],
+      pagination: { page: 1, per_page: 25, total_count: 0, total_pages: 0 },
+    });
+
+    const { rerender } = render(<TransactionsPage />);
+    expect(screen.getAllByText("Nenhuma transação encontrada.").length).toBeGreaterThan(0);
+
+    useTransactions.mockReturnValue({
+      ...useTransactions(),
+      items: [],
+      pagination: { page: 3, per_page: 25, total_count: 51, total_pages: 3 },
+    });
+    rerender(<TransactionsPage />);
+    expect(screen.getAllByText("Nenhuma transação encontrada.").length).toBeGreaterThan(0);
+  });
+
+  it("hydrates page and filters from the URL and resets to page one after a filter change", async () => {
+    const user = userEvent.setup();
+    useSearchParams.mockReturnValue(new URLSearchParams("card_id=7&month=3&year=2026&page=3&per_page=50"));
+    useTransactions.mockReturnValue({
+      ...useTransactions(),
+      pagination: { page: 3, per_page: 50, total_count: 76, total_pages: 2 },
+    });
+
+    render(<TransactionsPage />);
+
+    expect(useTransactions).toHaveBeenLastCalledWith(expect.objectContaining({
+      filters: expect.objectContaining({ cardId: "7", month: "3", year: "2026", page: 3, perPage: "50" }),
+    }));
+    await user.click(screen.getByRole("button", { name: "Filtrar cartão" }));
+    expect(push).toHaveBeenLastCalledWith("/transactions?card_id=7&month=3&year=2026&per_page=50");
+  });
+
   it("opens the edit modal and updates the selected transaction", async () => {
     const user = userEvent.setup();
 
@@ -208,7 +294,8 @@ describe("TransactionsPage", () => {
         cardId: "7",
         month: "3",
         year: "2026",
-        limit: "100",
+        page: 1,
+        perPage: "100",
       });
       expect(createObjectURL).toHaveBeenCalled();
       expect(click).toHaveBeenCalled();

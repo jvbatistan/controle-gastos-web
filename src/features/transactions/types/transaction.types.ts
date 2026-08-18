@@ -43,7 +43,13 @@ export type TransactionFilters = {
   cardId: "all" | "none" | string;
   month: "all" | string;
   year: "all" | string;
-  limit: "50" | "100" | "200";
+  page: number;
+  perPage: "25" | "50" | "100";
+};
+
+export type TransactionsPage = {
+  transactions: Transaction[];
+  pagination: { page: number; per_page: number; total_count: number; total_pages: number };
 };
 
 export type TransactionPayload = {
@@ -72,5 +78,6 @@ export const defaultTransactionFilters: TransactionFilters = {
   cardId: "all",
   month: "all",
   year: "all",
-  limit: "50",
+  page: 1,
+  perPage: "25",
 };

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/useAuth";
 
 import { AppLayout } from "@/components/AppLayout";
@@ -27,16 +27,34 @@ import { usePayments } from "@/features/payments";
 
 export default function TransactionsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const auth = useAuth();
 
-  const [filters, setFilters] = useState<Filters>(defaultTransactionFilters);
+  const [filters, setFilters] = useState<Filters>(() => ({
+    ...defaultTransactionFilters,
+    page: Math.max(Number(searchParams.get("page")) || 1, 1),
+    perPage: (searchParams.get("per_page") === "50" || searchParams.get("per_page") === "100") ? searchParams.get("per_page") as Filters["perPage"] : "25",
+    cardId: (searchParams.get("card_id") ?? "all") as Filters["cardId"],
+    month: searchParams.get("month") ?? "all",
+    year: searchParams.get("year") ?? "all",
+  }));
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
   const [classificationNotice, setClassificationNotice] = useState<string | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [exportingCsv, setExportingCsv] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
 
-  const clearFilters = () => setFilters(defaultTransactionFilters);
+  const updateFilters = useCallback((next: Filters) => {
+    const normalized = { ...next, page: next.page === filters.page ? 1 : next.page };
+    setFilters(normalized);
+    const params = new URLSearchParams();
+    if (normalized.cardId !== "all") params.set("card_id", normalized.cardId);
+    if (normalized.month !== "all" && normalized.year !== "all") { params.set("month", normalized.month); params.set("year", normalized.year); }
+    if (normalized.page > 1) params.set("page", String(normalized.page));
+    if (normalized.perPage !== "25") params.set("per_page", normalized.perPage);
+    router.push(`/transactions${params.size ? `?${params}` : ""}`);
+  }, [filters.page, router]);
+  const clearFilters = () => updateFilters(defaultTransactionFilters);
   const handleUnauthorized = useCallback(() => router.replace("/login"), [router]);
   const { createTransaction, loading: creating, error: createError } = useCreateTransaction({
     onUnauthorized: handleUnauthorized,
@@ -68,7 +86,7 @@ export default function TransactionsPage() {
     if (auth.status === "unauthenticated") router.replace("/login");
   }, [auth.status, router]);
 
-  const { items, loading, error: transactionsError, refetch } = useTransactions({
+  const { items, pagination, loading, error: transactionsError, refetch } = useTransactions({
     filters,
     enabled: auth.status === "authenticated",
     onUnauthorized: handleUnauthorized,
@@ -233,7 +251,7 @@ export default function TransactionsPage() {
                   {exportingCsv ? "Exportando..." : "Exportar CSV"}
                 </Button>
                 <div className="text-sm text-neutral-500">
-                  {loading ? "Carregando..." : `${items.length} itens`}
+                  {loading ? "Carregando..." : `${pagination.total_count} ${pagination.total_count === 1 ? "transação" : "transações"}`}
                 </div>
               </div>
             </div>
@@ -262,7 +280,7 @@ export default function TransactionsPage() {
             <TransactionFilters
               filters={filters}
               cards={cards.map((card) => ({ id: String(card.id), name: card.name }))}
-              onChange={setFilters}
+              onChange={updateFilters}
               onClear={clearFilters}
             />
             {cardsError && (
@@ -290,6 +308,13 @@ export default function TransactionsPage() {
               onDelete={handleDeleteTransaction}
               onReviewClassification={handleReviewClassification}
             />
+            {pagination.total_pages > 1 && (
+              <div className="mt-4 flex items-center justify-between gap-3">
+                <Button variant="outline" disabled={loading || pagination.page <= 1} onClick={() => updateFilters({ ...filters, page: filters.page - 1 })}>Anterior</Button>
+                <span className="text-sm text-neutral-600">Página {pagination.page} de {pagination.total_pages}</span>
+                <Button variant="outline" disabled={loading || pagination.page >= pagination.total_pages} onClick={() => updateFilters({ ...filters, page: filters.page + 1 })}>Próxima</Button>
+              </div>
+            )}
             {deleting && <p className="text-xs text-neutral-500">Arquivando transação...</p>}
       </AppLayout>
 

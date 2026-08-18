@@ -3,12 +3,14 @@ import {
   Transaction,
   TransactionFilters,
   TransactionPayload,
+  TransactionsPage,
 } from "@/features/transactions/types/transaction.types";
 import { api } from "@/lib/api";
 
 export function buildTransactionsQuery(filters: TransactionFilters) {
   const qs = new URLSearchParams();
-  qs.set("limit", filters.limit);
+  qs.set("page", String(filters.page));
+  qs.set("per_page", filters.perPage);
 
   if (filters.cardId !== "all") qs.set("card_id", filters.cardId);
   if (filters.month !== "all" && filters.year !== "all") {
@@ -25,12 +27,12 @@ export async function fetchTransactions(filters: TransactionFilters, signal?: Ab
     const data = (await api(`/api/transactions${query}`, {
       cache: "no-store",
       signal,
-    })) as Transaction[];
+    })) as TransactionsPage;
 
     return { status: 200 as const, data };
   } catch (err) {
     if (err instanceof Error && err.message.includes("401")) {
-      return { status: 401 as const, data: [] as Transaction[] };
+      return { status: 401 as const, data: { transactions: [], pagination: { page: filters.page, per_page: Number(filters.perPage), total_count: 0, total_pages: 0 } } as TransactionsPage };
     }
     throw err;
   }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/useAuth";
 
 import { AppLayout } from "@/components/AppLayout";
@@ -11,14 +11,20 @@ import { useDashboard } from "@/features/dashboard";
 
 export default function DashboardPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const auth = useAuth();
   const handleUnauthorized = useCallback(() => router.replace("/login"), [router]);
+  const now = new Date();
+  const month = Math.min(Math.max(Number(searchParams.get("month")) || now.getMonth() + 1, 1), 12);
+  const year = Math.max(Number(searchParams.get("year")) || now.getFullYear(), 1);
 
   useEffect(() => {
     if (auth.status === "unauthenticated") router.replace("/login");
   }, [auth.status, router]);
 
   const { overview, loading, error } = useDashboard({
+    month,
+    year,
     enabled: auth.status === "authenticated",
     onUnauthorized: handleUnauthorized,
   });

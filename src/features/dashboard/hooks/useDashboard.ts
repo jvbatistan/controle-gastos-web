@@ -5,11 +5,13 @@ import type { DashboardOverview } from "@/features/dashboard/types/dashboard.typ
 import { fetchDashboard } from "@/features/dashboard/services/dashboard.service";
 
 type UseDashboardParams = {
+  month: number;
+  year: number;
   enabled: boolean;
   onUnauthorized: () => void;
 };
 
-export function useDashboard({ enabled, onUnauthorized }: UseDashboardParams) {
+export function useDashboard({ month, year, enabled, onUnauthorized }: UseDashboardParams) {
   const [overview, setOverview] = useState<DashboardOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -23,7 +25,7 @@ export function useDashboard({ enabled, onUnauthorized }: UseDashboardParams) {
       try {
         setLoading(true);
         setError(null);
-        const result = await fetchDashboard(controller.signal);
+        const result = await fetchDashboard(month, year, controller.signal);
 
         if (result.status === 401) {
           onUnauthorized();
@@ -43,7 +45,7 @@ export function useDashboard({ enabled, onUnauthorized }: UseDashboardParams) {
     })();
 
     return () => controller.abort();
-  }, [enabled, onUnauthorized]);
+  }, [enabled, month, onUnauthorized, year]);
 
   return { overview, loading, error };
 }

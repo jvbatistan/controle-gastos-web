@@ -8,6 +8,7 @@ const useDashboard = vi.fn();
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push, replace }),
+  useSearchParams: () => new URLSearchParams("month=9&year=2026"),
 }));
 
 vi.mock("@/lib/useAuth", () => ({
@@ -107,6 +108,12 @@ beforeEach(() => {
 });
 
 describe("DashboardPage", () => {
+  it("passes the month and year from the URL to the dashboard hook", () => {
+    render(<DashboardPage />);
+
+    expect(useDashboard).toHaveBeenCalledWith(expect.objectContaining({ month: 9, year: 2026 }));
+  });
+
   it("renders income, expense and balance data in the financial dashboard", () => {
     render(<DashboardPage />);
 

@@ -1,9 +1,9 @@
 import { api } from "@/lib/api";
 import type { DashboardOverview } from "@/features/dashboard/types/dashboard.types";
 
-export async function fetchDashboard(signal?: AbortSignal) {
+export async function fetchDashboard(month: number, year: number, signal?: AbortSignal) {
   try {
-    const data = (await api("/api/dashboard", {
+    const data = (await api(`/api/dashboard?month=${month}&year=${year}`, {
       cache: "no-store",
       signal,
     })) as DashboardOverview;

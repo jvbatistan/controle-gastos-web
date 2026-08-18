@@ -15,6 +15,7 @@ type UseTransactionsParams = {
 
 export function useTransactions({ filters, enabled, onUnauthorized }: UseTransactionsParams) {
   const [items, setItems] = useState<Transaction[]>([]);
+  const [pagination, setPagination] = useState({ page: filters.page, per_page: Number(filters.perPage), total_count: 0, total_pages: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
@@ -39,7 +40,8 @@ export function useTransactions({ filters, enabled, onUnauthorized }: UseTransac
           return;
         }
 
-        setItems(result.data);
+        setItems(result.data.transactions);
+        setPagination(result.data.pagination);
       } catch (err: unknown) {
         if (!(err instanceof DOMException && err.name === "AbortError")) {
           console.error(err);
@@ -54,5 +56,5 @@ export function useTransactions({ filters, enabled, onUnauthorized }: UseTransac
     return () => controller.abort();
   }, [enabled, filters, onUnauthorized, reloadToken]);
 
-  return { items, loading, error, refetch };
+  return { items, pagination, loading, error, refetch };
 }

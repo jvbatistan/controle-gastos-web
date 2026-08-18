@@ -38,7 +38,7 @@ export function TransactionFilters({ filters, cards, onChange, onClear }: Props)
     (filters.cardId !== "all" ? 1 : 0) +
     (filters.month !== "all" ? 1 : 0) +
     (filters.year !== "all" ? 1 : 0) +
-    (filters.limit !== "50" ? 1 : 0);
+    (filters.perPage !== "25" ? 1 : 0);
 
   return (
     <Card>
@@ -76,15 +76,15 @@ export function TransactionFilters({ filters, cards, onChange, onClear }: Props)
           </Select>
 
           <Select
-            value={filters.limit}
-            onValueChange={(v) => onChange({ ...filters, limit: v as Filters["limit"] })}
+            value={filters.perPage}
+            onValueChange={(v) => onChange({ ...filters, perPage: v as Filters["perPage"] })}
           >
             <SelectTriggerHTML
               placeholder="Itens"
               options={[
+                { value: "25", label: "25 itens" },
                 { value: "50", label: "50 itens" },
                 { value: "100", label: "100 itens" },
-                { value: "200", label: "200 itens" },
               ]}
             />
           </Select>
