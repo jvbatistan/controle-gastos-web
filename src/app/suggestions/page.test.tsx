@@ -34,7 +34,7 @@ vi.mock("@/features/categories", () => ({
 }));
 
 vi.mock("@/features/classification-suggestions", () => ({
-  useClassificationSuggestions: () => useClassificationSuggestions(),
+  useClassificationSuggestions: (...args: unknown[]) => useClassificationSuggestions(...args),
   rejectClassificationSuggestion: (...args: unknown[]) => rejectClassificationSuggestion(...args),
   applyClassificationSuggestion: (...args: unknown[]) => applyClassificationSuggestion(...args),
 }));
@@ -77,6 +77,22 @@ beforeEach(() => {
 });
 
 describe("SuggestionsPage", () => {
+  it("uses the URL page, displays total_count, and navigates without dropping the selected suggestion", async () => {
+    const user = userEvent.setup();
+    useSearchParams.mockReturnValue({ get: (key: string) => ({ suggestion: "10", page: "2" })[key] ?? null });
+    useClassificationSuggestions.mockReturnValue({ suggestions: [suggestion], pagination: { page: 2, per_page: 25, total_count: 51, total_pages: 3 }, loading: false, error: null, refetch });
+    render(<SuggestionsPage />);
+    expect(useClassificationSuggestions).toHaveBeenCalledWith(expect.objectContaining({ page: 2 }));
+    expect(screen.getByText("51 sugestões")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Próxima" }));
+    expect(push).toHaveBeenCalledWith("/suggestions?page=3");
+  });
+
+  it("disables pagination at its boundaries", () => {
+    useClassificationSuggestions.mockReturnValue({ suggestions: [suggestion], pagination: { page: 1, per_page: 25, total_count: 26, total_pages: 2 }, loading: false, error: null, refetch });
+    render(<SuggestionsPage />);
+    expect(screen.getByRole("button", { name: "Anterior" })).toBeDisabled();
+  });
   it("renders the empty state when there are no pending suggestions", () => {
     useClassificationSuggestions.mockReturnValue({
       suggestions: [],

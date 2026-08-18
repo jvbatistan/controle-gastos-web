@@ -26,15 +26,15 @@ beforeEach(() => {
 
 describe("account transfer services", () => {
   it("fetches account transfers", async () => {
-    apiMock.mockResolvedValueOnce([transfer]);
+    apiMock.mockResolvedValueOnce({ transfers: [transfer], pagination: { page: 1, per_page: 10, total_count: 1, total_pages: 1 } });
 
     const result = await fetchAccountTransfers();
 
-    expect(apiMock).toHaveBeenCalledWith("/api/account_transfers", {
+    expect(apiMock).toHaveBeenCalledWith("/api/account_transfers?page=1&per_page=10", {
       cache: "no-store",
       signal: undefined,
     });
-    expect(result).toEqual({ status: 200, data: [transfer] });
+    expect(result).toEqual({ status: 200, data: { transfers: [transfer], pagination: { page: 1, per_page: 10, total_count: 1, total_pages: 1 } } });
   });
 
   it("creates an account transfer with the expected payload", async () => {
@@ -85,6 +85,6 @@ describe("account transfer services", () => {
   it("returns unauthorized status when API error includes 401", async () => {
     apiMock.mockRejectedValueOnce(new Error("HTTP 401"));
 
-    await expect(fetchAccountTransfers()).resolves.toEqual({ status: 401, data: [] });
+    await expect(fetchAccountTransfers()).resolves.toEqual({ status: 401, data: { transfers: [], pagination: { page: 1, per_page: 10, total_count: 0, total_pages: 0 } } });
   });
 });

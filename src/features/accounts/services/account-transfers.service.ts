@@ -1,17 +1,17 @@
 import type { AccountTransfer, CreateAccountTransferPayload } from "@/features/accounts/types/account-transfer.types";
 import { api } from "@/lib/api";
 
-export async function fetchAccountTransfers(options: { signal?: AbortSignal } = {}) {
+export async function fetchAccountTransfers(options: { signal?: AbortSignal; page?: number; perPage?: number } = {}) {
   try {
-    const data = (await api("/api/account_transfers", {
+    const data = (await api(`/api/account_transfers?page=${options.page ?? 1}&per_page=${options.perPage ?? 10}`, {
       cache: "no-store",
       signal: options.signal,
-    })) as AccountTransfer[];
+    })) as { transfers: AccountTransfer[]; pagination: { page: number; per_page: number; total_count: number; total_pages: number } };
 
     return { status: 200 as const, data };
   } catch (err) {
     if (err instanceof Error && err.message.includes("401")) {
-      return { status: 401 as const, data: [] as AccountTransfer[] };
+      return { status: 401 as const, data: { transfers: [] as AccountTransfer[], pagination: { page: 1, per_page: 10, total_count: 0, total_pages: 0 } } };
     }
     throw err;
   }

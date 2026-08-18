@@ -5,12 +5,14 @@ import { fetchClassificationSuggestions } from "@/features/classification-sugges
 import type { ClassificationSuggestion } from "@/features/classification-suggestions/types/classification-suggestion.types";
 
 type UseClassificationSuggestionsParams = {
+  page: number;
   enabled: boolean;
   onUnauthorized: () => void;
 };
 
-export function useClassificationSuggestions({ enabled, onUnauthorized }: UseClassificationSuggestionsParams) {
+export function useClassificationSuggestions({ page, enabled, onUnauthorized }: UseClassificationSuggestionsParams) {
   const [suggestions, setSuggestions] = useState<ClassificationSuggestion[]>([]);
+  const [pagination, setPagination] = useState({ page, per_page: 25, total_count: 0, total_pages: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -20,13 +22,14 @@ export function useClassificationSuggestions({ enabled, onUnauthorized }: UseCla
         setLoading(true);
         setError(null);
 
-        const result = await fetchClassificationSuggestions(signal);
+        const result = await fetchClassificationSuggestions(page, signal);
         if (result.status === 401) {
           onUnauthorized();
           return;
         }
 
-        setSuggestions(result.data);
+        setSuggestions(result.data.suggestions);
+        setPagination(result.data.pagination);
       } catch (err) {
         if (!(err instanceof DOMException && err.name === "AbortError")) {
           console.error(err);
@@ -37,7 +40,7 @@ export function useClassificationSuggestions({ enabled, onUnauthorized }: UseCla
         if (!signal?.aborted) setLoading(false);
       }
     },
-    [onUnauthorized]
+    [onUnauthorized, page]
   );
 
   useEffect(() => {
@@ -48,5 +51,5 @@ export function useClassificationSuggestions({ enabled, onUnauthorized }: UseCla
     return () => controller.abort();
   }, [enabled, refetch]);
 
-  return { suggestions, loading, error, refetch };
+  return { suggestions, pagination, loading, error, refetch };
 }

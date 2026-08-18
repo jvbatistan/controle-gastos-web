@@ -46,6 +46,7 @@ function SuggestionsPageContent() {
   const [selectedCategoryIdBySuggestion, setSelectedCategoryIdBySuggestion] = useState<Record<number, string>>({});
 
   const selectedSuggestionId = Number(searchParams.get("suggestion") || "0") || null;
+  const page = Math.max(Number(searchParams.get("page")) || 1, 1);
 
   const handleUnauthorized = useCallback(() => router.replace("/login"), [router]);
 
@@ -53,7 +54,8 @@ function SuggestionsPageContent() {
     if (auth.status === "unauthenticated") router.replace("/login");
   }, [auth.status, router]);
 
-  const { suggestions, loading, error, refetch } = useClassificationSuggestions({
+  const { suggestions, pagination = { page, per_page: 25, total_count: 0, total_pages: 0 }, loading, error, refetch } = useClassificationSuggestions({
+    page,
     enabled: auth.status === "authenticated",
     onUnauthorized: handleUnauthorized,
   });
@@ -149,7 +151,7 @@ function SuggestionsPageContent() {
                 <p className="mt-1 text-neutral-500">Revise as transações que ainda precisam de confirmação de categoria.</p>
               </div>
               <div className="text-sm text-neutral-500">
-                {loading ? "Carregando..." : `${orderedSuggestions.length} pendências`}
+                {loading ? "Carregando..." : `${pagination.total_count} sugestões`}
               </div>
             </div>
 
@@ -284,6 +286,13 @@ function SuggestionsPageContent() {
                 );
               })}
             </div>
+            {pagination.total_pages > 1 && (
+              <div className="mt-4 flex items-center justify-between gap-3">
+                <Button variant="outline" disabled={loading || page <= 1} onClick={() => router.push(`/suggestions?page=${page - 1}`)}>Anterior</Button>
+                <span className="text-sm text-neutral-600">Página {page} de {pagination.total_pages}</span>
+                <Button variant="outline" disabled={loading || page >= pagination.total_pages} onClick={() => router.push(`/suggestions?page=${page + 1}`)}>Próxima</Button>
+              </div>
+            )}
     </AppLayout>
   );
 }

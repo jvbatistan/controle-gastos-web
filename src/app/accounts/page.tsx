@@ -112,7 +112,7 @@ export default function AccountsPage() {
         return;
       }
 
-      setTransfers(result.data);
+      setTransfers(Array.isArray(result.data) ? result.data : result.data.transfers);
     } catch (err) {
       if (!(err instanceof DOMException && err.name === "AbortError")) {
         console.error(err);
@@ -142,7 +142,7 @@ export default function AccountsPage() {
     [activeAccounts.accounts]
   );
   const canTransfer = activeAccounts.accounts.length >= 2;
-  const latestTransfers = useMemo(() => transfers.slice(0, 10), [transfers]);
+  const latestTransfers = transfers;
   const selectedFromAccount = useMemo(
     () => activeAccounts.accounts.find((account) => String(account.id) === transferForm.from_account_id),
     [activeAccounts.accounts, transferForm.from_account_id]
