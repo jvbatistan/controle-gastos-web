@@ -278,7 +278,7 @@ describe("TransactionsPage", () => {
     await user.type(screen.getByPlaceholderText("Ex: Compra no supermercado"), "Pix mercado");
     await user.type(screen.getByPlaceholderText("0,00"), "15000");
     fireEvent.change(screen.getByDisplayValue("Dinheiro"), { target: { value: "bank" } });
-    fireEvent.change(screen.getByDisplayValue("Selecione a conta de onde o dinheiro saiu"), { target: { value: "3" } });
+    fireEvent.change(screen.getByDisplayValue("Selecione a conta para o pagamento"), { target: { value: "3" } });
     await user.click(screen.getByRole("button", { name: "Salvar despesa" }));
 
     await waitFor(() => {

@@ -129,7 +129,7 @@ function TransactionCreateFormFields({
   );
   const accountOptions = useMemo(
     () => [
-      { value: "none", label: isIncome ? "Selecione a conta onde o dinheiro entrou" : "Selecione a conta de onde o dinheiro saiu" },
+      { value: "none", label: isIncome ? "Selecione a conta onde o dinheiro entrou" : "Selecione a conta para o pagamento" },
       ...accounts.map((account) => ({ value: String(account.id), label: account.name })),
     ],
     [accounts, isIncome]
@@ -144,7 +144,7 @@ function TransactionCreateFormFields({
     const normalizedInstallmentsCount = Number(installmentsCount);
     const effectiveSource = isIncome && source === "card" ? "bank" : source;
     const requiresCard = !isIncome && effectiveSource === "card";
-    const requiresAccount = isIncome || (!isIncome && effectiveSource !== "card");
+    const requiresAccount = isIncome || (!isIncome && effectiveSource !== "card" && paid);
 
     if (!normalizedDescription || !date || !(normalizedValue > 0)) {
       setError("Preencha descrição, valor e data corretamente.");
@@ -157,7 +157,7 @@ function TransactionCreateFormFields({
     }
 
     if (requiresAccount && accountId === "none") {
-      setError(isIncome ? "Selecione a conta onde o dinheiro entrou." : "Selecione a conta de onde o dinheiro saiu.");
+      setError(isIncome ? "Selecione a conta onde o dinheiro entrou." : "Selecione a conta usada no pagamento.");
       return;
     }
 
@@ -186,7 +186,7 @@ function TransactionCreateFormFields({
       paid: isIncome ? true : paid,
       note: note.trim() || undefined,
       card_id: !isIncome && effectiveSource === "card" && cardId !== "none" ? Number(cardId) : null,
-      account_id: requiresAccount && accountId !== "none" ? Number(accountId) : null,
+      account_id: showsAccountField && accountId !== "none" ? Number(accountId) : null,
       installment_number: !isIncome && !isEditing && hasInstallments && !refund ? normalizedInstallmentNumber : null,
       installments_count: !isIncome && !isEditing && hasInstallments && !refund ? normalizedInstallmentsCount : null,
     });
@@ -334,11 +334,11 @@ function TransactionCreateFormFields({
 
           {showsAccountField && (
             <div className="space-y-2">
-              <FieldLabel>Conta</FieldLabel>
+              <FieldLabel>{isIncome ? "Conta" : "Conta para pagamento"}</FieldLabel>
               {hasAccounts ? (
                 <Select value={accountId} onValueChange={setAccountId}>
                   <SelectTriggerHTML
-                    placeholder={isIncome ? "Selecione a conta onde o dinheiro entrou" : "Selecione a conta de onde o dinheiro saiu"}
+                    placeholder={isIncome ? "Selecione a conta onde o dinheiro entrou" : "Selecione a conta para o pagamento"}
                     options={accountOptions}
                     className="h-11 rounded-xl bg-white"
                   />
@@ -352,12 +352,17 @@ function TransactionCreateFormFields({
                   <p>
                     {isIncome
                       ? "Nenhuma conta cadastrada. Crie uma conta antes de lançar receitas."
-                      : "Nenhuma conta cadastrada. Crie uma conta antes de lançar despesas sem cartão."}
+                      : paid
+                        ? "Nenhuma conta cadastrada. Crie uma conta antes de marcar a despesa como paga."
+                        : "Nenhuma conta cadastrada. Você pode salvar a despesa em aberto sem uma conta."}
                   </p>
                   <Link href="/accounts" className="mt-2 inline-flex font-medium text-amber-900 underline underline-offset-4">
                     Criar conta
                   </Link>
                 </div>
+              )}
+              {!isIncome && !paid && (
+                <p className="text-xs text-neutral-500">Opcional enquanto a despesa estiver em aberto; indica a conta planejada para o pagamento.</p>
               )}
             </div>
           )}

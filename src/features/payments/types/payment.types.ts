@@ -42,6 +42,10 @@ export type LooseExpenseTransaction = {
   installments_count?: number | null;
   source: "card" | "cash" | "bank";
   category_id?: number | null;
+  account?: {
+    id: number;
+    name: string;
+  } | null;
   paid: boolean;
   payment_ignored_at?: string | null;
 };

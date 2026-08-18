@@ -38,7 +38,7 @@ describe("TransactionCreateForm", () => {
 
     fireEvent.change(screen.getByDisplayValue("Dinheiro"), { target: { value: "card" } });
     fireEvent.change(screen.getByDisplayValue("Selecione um cartão"), { target: { value: "7" } });
-    expect(screen.queryByDisplayValue("Selecione a conta de onde o dinheiro saiu")).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue("Selecione a conta para o pagamento")).not.toBeInTheDocument();
 
     await user.click(screen.getByLabelText("Compra parcelada"));
     await user.clear(screen.getByPlaceholderText("1"));
@@ -75,13 +75,13 @@ describe("TransactionCreateForm", () => {
       />
     );
 
-    expect(screen.getByText("Conta")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("Selecione a conta de onde o dinheiro saiu")).toBeInTheDocument();
+    expect(screen.getByText("Conta para pagamento")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Selecione a conta para o pagamento")).toBeInTheDocument();
 
     await user.type(screen.getByPlaceholderText("Ex: Compra no supermercado"), "Pix mercado");
     await user.type(screen.getByPlaceholderText("0,00"), "15000");
     fireEvent.change(screen.getByDisplayValue("Dinheiro"), { target: { value: "bank" } });
-    fireEvent.change(screen.getByDisplayValue("Selecione a conta de onde o dinheiro saiu"), { target: { value: "3" } });
+    fireEvent.change(screen.getByDisplayValue("Selecione a conta para o pagamento"), { target: { value: "3" } });
     await user.click(screen.getByRole("button", { name: "Salvar despesa" }));
 
     await waitFor(() => {
@@ -98,7 +98,7 @@ describe("TransactionCreateForm", () => {
     });
   });
 
-  it("blocks cash or bank expense submit without an account", async () => {
+  it("allows an unpaid cash or bank expense without an account", async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn().mockResolvedValue(undefined);
 
@@ -114,14 +114,27 @@ describe("TransactionCreateForm", () => {
     await user.type(screen.getByPlaceholderText("0,00"), "1000");
     await user.click(screen.getByRole("button", { name: "Salvar despesa" }));
 
-    expect(screen.getByText("Selecione a conta de onde o dinheiro saiu.")).toBeInTheDocument();
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ paid: false, account_id: null })));
+  });
+
+  it("blocks a paid cash or bank expense without an account", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(<TransactionCreateForm cards={[]} accounts={[{ id: 3, name: "Conta Corrente" }]} onSubmit={onSubmit} />);
+
+    await user.type(screen.getByPlaceholderText("Ex: Compra no supermercado"), "Mercado pago");
+    await user.type(screen.getByPlaceholderText("0,00"), "1000");
+    await user.click(screen.getByLabelText("Marcar como paga"));
+    await user.click(screen.getByRole("button", { name: "Salvar despesa" }));
+
+    expect(screen.getByText("Selecione a conta usada no pagamento.")).toBeInTheDocument();
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
   it("guides the user to create an account for expenses without card when there are no active accounts", () => {
     render(<TransactionCreateForm cards={[]} accounts={[]} onSubmit={vi.fn()} />);
 
-    expect(screen.getByText("Nenhuma conta cadastrada. Crie uma conta antes de lançar despesas sem cartão.")).toBeInTheDocument();
+    expect(screen.getByText("Nenhuma conta cadastrada. Você pode salvar a despesa em aberto sem uma conta.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Criar conta" })).toHaveAttribute("href", "/accounts");
   });
 
@@ -139,7 +152,7 @@ describe("TransactionCreateForm", () => {
 
     await user.type(screen.getByPlaceholderText("Ex: Compra no supermercado"), "Compra cartão");
     await user.type(screen.getByPlaceholderText("0,00"), "1000");
-    fireEvent.change(screen.getByDisplayValue("Selecione a conta de onde o dinheiro saiu"), { target: { value: "3" } });
+    fireEvent.change(screen.getByDisplayValue("Selecione a conta para o pagamento"), { target: { value: "3" } });
     fireEvent.change(screen.getByDisplayValue("Dinheiro"), { target: { value: "card" } });
     fireEvent.change(screen.getByDisplayValue("Selecione um cartão"), { target: { value: "7" } });
 

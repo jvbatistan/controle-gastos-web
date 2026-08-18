@@ -302,10 +302,11 @@ describe("PaymentsPage", () => {
 
     await user.click(screen.getByRole("button", { name: /Avulsas/i }));
     await user.click(screen.getAllByRole("button", { name: /Pagar despesa/i })[0]);
+    await user.selectOptions(screen.getByDisplayValue("Selecione a conta de onde saiu o dinheiro"), "3");
     await user.click(screen.getByRole("button", { name: /Confirmar pagamento da despesa/i }));
 
     await waitFor(() => {
-      expect(payLooseExpense).toHaveBeenCalledWith(1, expect.any(Number), expect.any(Number));
+      expect(payLooseExpense).toHaveBeenCalledWith(1, expect.any(Number), expect.any(Number), 3);
       expect(refetch).toHaveBeenCalled();
       expect(screen.getByText('Despesa "MERCADO" marcada como paga.')).toBeInTheDocument();
     });
@@ -332,10 +333,11 @@ describe("PaymentsPage", () => {
 
     await user.click(screen.getByRole("button", { name: /Avulsas/i }));
     await user.click(screen.getByRole("button", { name: /Pagar todas as despesas/i }));
+    await user.selectOptions(screen.getByDisplayValue("Selecione a conta de onde saiu o dinheiro"), "3");
     await user.click(screen.getByRole("button", { name: /Confirmar pagamento em lote/i }));
 
     await waitFor(() => {
-      expect(payLooseExpenses).toHaveBeenCalledWith(expect.any(Number), expect.any(Number));
+      expect(payLooseExpenses).toHaveBeenCalledWith(expect.any(Number), expect.any(Number), 3);
       expect(refetch).toHaveBeenCalled();
       expect(screen.getByText("2 despesas avulsas marcadas como pagas.")).toBeInTheDocument();
     });
@@ -372,10 +374,11 @@ describe("PaymentsPage", () => {
     expect(ignoreButtons[1]).toBeEnabled();
 
     await user.click(itemButtons[0]);
+    await user.selectOptions(screen.getByDisplayValue("Selecione a conta de onde saiu o dinheiro"), "3");
     await user.click(screen.getByRole("button", { name: /Confirmar pagamento da despesa/i }));
 
     await waitFor(() => {
-      expect(payLooseExpense).toHaveBeenCalledWith(1, expect.any(Number), expect.any(Number));
+      expect(payLooseExpense).toHaveBeenCalledWith(1, expect.any(Number), expect.any(Number), 3);
       expect(batchButton).toBeDisabled();
       expect(itemButtons[0]).toBeDisabled();
       expect(itemButtons[1]).toBeDisabled();

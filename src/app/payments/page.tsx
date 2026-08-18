@@ -88,6 +88,7 @@ export default function PaymentsPage() {
   const [submittingKey, setSubmittingKey] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<PaymentConfirmation | null>(null);
   const [statementAccountId, setStatementAccountId] = useState("none");
+  const [looseAccountId, setLooseAccountId] = useState("none");
 
   const handleUnauthorized = useCallback(() => router.replace("/login"), [router]);
 
@@ -175,11 +176,11 @@ export default function PaymentsPage() {
     }
   }
 
-  async function submitPayLooseExpense(transactionId: number, description: string) {
+  async function submitPayLooseExpense(transactionId: number, description: string, accountId: number) {
     try {
       setSubmittingKey(`loose-expense-${transactionId}`);
       setMessage(null);
-      const result = await payLooseExpense(transactionId, Number(month), Number(year));
+      const result = await payLooseExpense(transactionId, Number(month), Number(year), accountId);
       if (result.status === 401) {
         handleUnauthorized();
         return;
@@ -211,11 +212,11 @@ export default function PaymentsPage() {
     }
   }
 
-  async function submitPayLooseExpenses() {
+  async function submitPayLooseExpenses(accountId: number) {
     try {
       setSubmittingKey("loose-expenses");
       setMessage(null);
-      const result = await payLooseExpenses(Number(month), Number(year));
+      const result = await payLooseExpenses(Number(month), Number(year), accountId);
       if (result.status === 401) {
         handleUnauthorized();
         return;
@@ -239,6 +240,11 @@ export default function PaymentsPage() {
       return;
     }
 
+    if ((current.kind === "loose-expense" || current.kind === "loose-expenses") && looseAccountId === "none") {
+      setMessage("Selecione a conta usada no pagamento da despesa.");
+      return;
+    }
+
     setConfirmation(null);
 
     if (current.kind === "statement") {
@@ -253,7 +259,8 @@ export default function PaymentsPage() {
     }
 
     if (current.kind === "loose-expense") {
-      await submitPayLooseExpense(current.transactionId, current.description);
+      await submitPayLooseExpense(current.transactionId, current.description, Number(looseAccountId));
+      setLooseAccountId("none");
       return;
     }
 
@@ -262,7 +269,8 @@ export default function PaymentsPage() {
       return;
     }
 
-    await submitPayLooseExpenses();
+    await submitPayLooseExpenses(Number(looseAccountId));
+    setLooseAccountId("none");
   }
 
   if (auth.status !== "authenticated") {
@@ -557,12 +565,15 @@ export default function PaymentsPage() {
                           <p className="text-sm opacity-90">Você pode marcar cada despesa individualmente ou quitar tudo de uma vez.</p>
                           <Button
                             variant="outline"
-                            onClick={() => setConfirmation({
-                              kind: "loose-expenses",
-                              count: looseExpenses.transactions_count,
-                              totalAmount: totalLooseExpenses,
-                              period: periodLabel(month, year),
-                            })}
+                            onClick={() => {
+                              setLooseAccountId("none");
+                              setConfirmation({
+                                kind: "loose-expenses",
+                                count: looseExpenses.transactions_count,
+                                totalAmount: totalLooseExpenses,
+                                period: periodLabel(month, year),
+                              });
+                            }}
                             disabled={isSubmittingLooseExpenses}
                             className="border-white/70 bg-white text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
                           >
@@ -610,12 +621,15 @@ export default function PaymentsPage() {
                               <div className="flex flex-col gap-2 sm:w-[132px]">
                                 <Button
                                   size="sm"
-                                  onClick={() => setConfirmation({
-                                    kind: "loose-expense",
-                                    transactionId: transaction.id,
-                                    description: transaction.description,
-                                    amount: Number(transaction.value),
-                                  })}
+                                  onClick={() => {
+                                    setLooseAccountId(transaction.account?.id ? String(transaction.account.id) : "none");
+                                    setConfirmation({
+                                      kind: "loose-expense",
+                                      transactionId: transaction.id,
+                                      description: transaction.description,
+                                      amount: Number(transaction.value),
+                                    });
+                                  }}
                                   disabled={isSubmittingLooseExpenses}
                                   className="bg-emerald-600 text-white hover:bg-emerald-700"
                                 >
@@ -796,6 +810,7 @@ export default function PaymentsPage() {
                     onClick={() => {
                       setConfirmation(null);
                       setStatementAccountId("none");
+                      setLooseAccountId("none");
                     }}
                     disabled={submittingKey !== null}
                   >
@@ -836,6 +851,31 @@ export default function PaymentsPage() {
                   </div>
                 )}
 
+                {(confirmation.kind === "loose-expense" || confirmation.kind === "loose-expenses") && (
+                  <div className="mt-4 space-y-2">
+                    <label className="text-sm font-medium text-neutral-700">Conta do pagamento</label>
+                    {hasAccounts ? (
+                      <Select value={looseAccountId} onValueChange={setLooseAccountId}>
+                        <SelectTriggerHTML
+                          placeholder="Selecione a conta de onde saiu o dinheiro"
+                          options={accountOptions}
+                          className="h-11 rounded-xl bg-white"
+                        />
+                      </Select>
+                    ) : accountsLoading ? (
+                      <p className="rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-600">Carregando contas...</p>
+                    ) : (
+                      <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                        <p>Nenhuma conta cadastrada. Crie uma conta antes de pagar despesas.</p>
+                        <Link href="/accounts" className="mt-2 inline-flex font-medium text-amber-900 underline underline-offset-4">
+                          Criar conta
+                        </Link>
+                      </div>
+                    )}
+                    <p className="text-xs text-neutral-500">A despesa só reduzirá o saldo e entrará no extrato depois deste pagamento.</p>
+                  </div>
+                )}
+
                 <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:justify-end">
                   <Button
                     type="button"
@@ -843,6 +883,7 @@ export default function PaymentsPage() {
                     onClick={() => {
                       setConfirmation(null);
                       setStatementAccountId("none");
+                      setLooseAccountId("none");
                     }}
                     disabled={submittingKey !== null}
                   >
@@ -851,7 +892,11 @@ export default function PaymentsPage() {
                   <Button
                     type="button"
                     onClick={() => void handleConfirmPayment()}
-                    disabled={submittingKey !== null || (confirmation.kind === "statement" && (!hasAccounts || accountsLoading))}
+                    disabled={
+                      submittingKey !== null ||
+                      ((confirmation.kind === "statement" || confirmation.kind === "loose-expense" || confirmation.kind === "loose-expenses") &&
+                        (!hasAccounts || accountsLoading))
+                    }
                     className="bg-neutral-900 text-white hover:bg-neutral-800"
                   >
                     {confirmation.kind === "statement"

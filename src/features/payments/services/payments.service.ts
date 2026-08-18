@@ -47,11 +47,11 @@ export async function payCardStatement(statementId: number, payload: PayCardStat
   }
 }
 
-export async function payLooseExpenses(month: number, year: number) {
+export async function payLooseExpenses(month: number, year: number, accountId: number) {
   try {
     const data = (await api("/api/payments/loose_expenses/pay", {
       method: "POST",
-      body: JSON.stringify({ month, year }),
+      body: JSON.stringify({ month, year, account_id: accountId }),
       cache: "no-store",
     })) as { paid_transactions_count: number; total_amount: number };
 
@@ -64,11 +64,11 @@ export async function payLooseExpenses(month: number, year: number) {
   }
 }
 
-export async function payLooseExpense(transactionId: number, month: number, year: number) {
+export async function payLooseExpense(transactionId: number, month: number, year: number, accountId: number) {
   try {
     const data = (await api(`/api/payments/loose_expenses/${transactionId}/pay`, {
       method: "POST",
-      body: JSON.stringify({ month, year }),
+      body: JSON.stringify({ month, year, account_id: accountId }),
       cache: "no-store",
     })) as LooseExpenseTransaction;
 
