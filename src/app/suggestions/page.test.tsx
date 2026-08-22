@@ -77,6 +77,25 @@ beforeEach(() => {
 });
 
 describe("SuggestionsPage", () => {
+  it.each([
+    ["2026-08-22", "22/08/2026"],
+    ["2026-08-01", "01/08/2026"],
+    ["2026-01-01", "01/01/2026"],
+    ["2026-12-31", "31/12/2026"],
+    ["2024-02-29", "29/02/2024"],
+  ])("renders the civil date %s without a timezone shift", (date, expected) => {
+    useClassificationSuggestions.mockReturnValue({
+      suggestions: [{ ...suggestion, financial_transaction: { ...suggestion.financial_transaction, date } }],
+      loading: false,
+      error: null,
+      refetch,
+    });
+
+    render(<SuggestionsPage />);
+
+    expect(screen.getByText(expected)).toBeInTheDocument();
+  });
+
   it("uses the URL page, displays total_count, and navigates without dropping the selected suggestion", async () => {
     const user = userEvent.setup();
     useSearchParams.mockReturnValue({ get: (key: string) => ({ suggestion: "10", page: "2" })[key] ?? null });

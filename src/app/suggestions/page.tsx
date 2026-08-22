@@ -18,7 +18,9 @@ import {
 } from "@/features/classification-suggestions";
 
 function formatDateBR(dateISO: string) {
-  return new Date(dateISO).toLocaleDateString("pt-BR");
+  const [year, month, day] = dateISO.split("-");
+
+  return `${day}/${month}/${year}`;
 }
 
 function formatBRL(value: number) {
