@@ -26,6 +26,18 @@ const baseTransaction: Transaction = {
 };
 
 describe("TransactionTable", () => {
+  it.each([
+    ["2026-08-22", "22/08/2026"],
+    ["2026-08-01", "01/08/2026"],
+    ["2026-01-01", "01/01/2026"],
+    ["2026-12-31", "31/12/2026"],
+    ["2024-02-29", "29/02/2024"],
+  ])("renders the civil date %s without a timezone shift", (date, expected) => {
+    render(<TransactionTable items={[{ ...baseTransaction, date }]} loading={false} />);
+
+    expect(screen.getAllByText(expected).length).toBeGreaterThan(0);
+  });
+
   it("renders the classification badge for a pending suggestion", () => {
     render(<TransactionTable items={[baseTransaction]} loading={false} />);
 

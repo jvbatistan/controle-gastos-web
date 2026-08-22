@@ -355,6 +355,7 @@ describe("TransactionCreateForm", () => {
 
     expect(screen.getByDisplayValue("MERCADO")).toBeInTheDocument();
     expect(screen.getByDisplayValue("89,90")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("2026-03-18")).toBeInTheDocument();
     expect(screen.getByText(/Esta edição afeta apenas a parcela selecionada/i)).toBeInTheDocument();
 
     await user.clear(screen.getByPlaceholderText("Ex: Compra no supermercado"));
@@ -366,6 +367,7 @@ describe("TransactionCreateForm", () => {
         expect.objectContaining({
           description: "Mercado novo",
           value: 89.9,
+          date: "2026-03-18",
           source: "card",
           card_id: 7,
           paid: true,
