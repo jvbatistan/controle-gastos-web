@@ -22,9 +22,11 @@ export type Transaction = {
   id: number;
   description: string;
   value: number;
+  original_value?: number | null;
   signed_value?: number;
   refund?: boolean;
   date: string;
+  purchase_date?: string | null;
   kind: "income" | "expense";
   source?: "card" | "cash" | "bank";
   paid: boolean;
@@ -55,8 +57,10 @@ export type TransactionsPage = {
 export type TransactionPayload = {
   description: string;
   value: number;
+  original_value?: number | null;
   refund?: boolean;
   date: string;
+  purchase_date?: string | null;
   kind: "income" | "expense";
   source: "card" | "cash" | "bank";
   paid: boolean;

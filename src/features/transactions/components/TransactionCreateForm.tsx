@@ -268,7 +268,7 @@ function TransactionCreateFormFields({
           </div>
 
           <div className="space-y-2">
-            <FieldLabel>Valor (R$)</FieldLabel>
+            <FieldLabel>{!isIncome && hasInstallments && !refund ? "Valor da parcela (R$)" : "Valor (R$)"}</FieldLabel>
             <Input
               type="text"
               inputMode="decimal"
