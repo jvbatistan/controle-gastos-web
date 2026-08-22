@@ -11,11 +11,13 @@ describe("TransactionCreateForm", () => {
 
     expect(screen.queryByPlaceholderText("Parcela atual")).not.toBeInTheDocument();
     expect(screen.queryByPlaceholderText("10")).not.toBeInTheDocument();
+    expect(screen.getByText("Valor (R$)")).toBeInTheDocument();
 
     await user.click(screen.getByLabelText("Compra parcelada"));
 
     expect(screen.getByPlaceholderText("1")).toBeInTheDocument();
     expect(screen.getByPlaceholderText("10")).toBeInTheDocument();
+    expect(screen.getByText("Valor da parcela (R$)")).toBeInTheDocument();
   });
 
   it("formats the currency input and submits the normalized payload", async () => {
