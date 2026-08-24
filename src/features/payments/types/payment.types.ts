@@ -37,6 +37,8 @@ export type LooseExpenseTransaction = {
   signed_value?: number;
   refund?: boolean;
   date: string;
+  settled_on?: string | null;
+  settled_value?: number | null;
   note?: string | null;
   installment_number?: number | null;
   installments_count?: number | null;

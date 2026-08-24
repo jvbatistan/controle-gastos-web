@@ -8,6 +8,7 @@ import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import {
   TransactionCreateForm,
+  TransactionDetailsDialog,
   TransactionFilters,
   TransactionStats,
   TransactionTable,
@@ -41,6 +42,7 @@ export default function TransactionsPage() {
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
   const [classificationNotice, setClassificationNotice] = useState<string | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  const [viewingTransaction, setViewingTransaction] = useState<Transaction | null>(null);
   const [exportingCsv, setExportingCsv] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
 
@@ -66,7 +68,7 @@ export default function TransactionsPage() {
     onUnauthorized: handleUnauthorized,
   });
   const handleViewTransaction = useCallback((tx: Transaction) => {
-    console.info("view transaction", tx.id);
+    setViewingTransaction(tx);
   }, []);
   const handleEditTransaction = useCallback((tx: Transaction) => {
     setEditingTransaction(tx);
@@ -373,6 +375,8 @@ export default function TransactionsPage() {
           </div>
         </div>
       )}
+
+      <TransactionDetailsDialog transaction={viewingTransaction} onClose={() => setViewingTransaction(null)} />
     </>
   );
 }

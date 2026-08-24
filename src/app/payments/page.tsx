@@ -63,6 +63,13 @@ function periodLabel(month: string, year: string) {
   return `${monthLabel}/${year}`;
 }
 
+function localDateISO() {
+  const today = new Date();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+  return `${today.getFullYear()}-${month}-${day}`;
+}
+
 function renderInstallmentLabel(transaction: {
   installment_number?: number | null;
   installments_count?: number | null;
@@ -89,6 +96,8 @@ export default function PaymentsPage() {
   const [confirmation, setConfirmation] = useState<PaymentConfirmation | null>(null);
   const [statementAccountId, setStatementAccountId] = useState("none");
   const [looseAccountId, setLooseAccountId] = useState("none");
+  const [looseSettledOn, setLooseSettledOn] = useState(localDateISO);
+  const [looseSettledValue, setLooseSettledValue] = useState("");
 
   const handleUnauthorized = useCallback(() => router.replace("/login"), [router]);
 
@@ -176,11 +185,11 @@ export default function PaymentsPage() {
     }
   }
 
-  async function submitPayLooseExpense(transactionId: number, description: string, accountId: number) {
+  async function submitPayLooseExpense(transactionId: number, description: string, accountId: number, settledOn: string, settledValue: number) {
     try {
       setSubmittingKey(`loose-expense-${transactionId}`);
       setMessage(null);
-      const result = await payLooseExpense(transactionId, Number(month), Number(year), accountId);
+      const result = await payLooseExpense(transactionId, Number(month), Number(year), accountId, settledOn, settledValue);
       if (result.status === 401) {
         handleUnauthorized();
         return;
@@ -212,11 +221,11 @@ export default function PaymentsPage() {
     }
   }
 
-  async function submitPayLooseExpenses(accountId: number) {
+  async function submitPayLooseExpenses(accountId: number, settledOn: string) {
     try {
       setSubmittingKey("loose-expenses");
       setMessage(null);
-      const result = await payLooseExpenses(Number(month), Number(year), accountId);
+      const result = await payLooseExpenses(Number(month), Number(year), accountId, settledOn);
       if (result.status === 401) {
         handleUnauthorized();
         return;
@@ -245,6 +254,16 @@ export default function PaymentsPage() {
       return;
     }
 
+    if ((current.kind === "loose-expense" || current.kind === "loose-expenses") && !looseSettledOn) {
+      setMessage("Informe a data efetiva do pagamento.");
+      return;
+    }
+
+    if (current.kind === "loose-expense" && !(Number(looseSettledValue) > 0)) {
+      setMessage("Informe o valor efetivamente pago.");
+      return;
+    }
+
     setConfirmation(null);
 
     if (current.kind === "statement") {
@@ -259,8 +278,9 @@ export default function PaymentsPage() {
     }
 
     if (current.kind === "loose-expense") {
-      await submitPayLooseExpense(current.transactionId, current.description, Number(looseAccountId));
+      await submitPayLooseExpense(current.transactionId, current.description, Number(looseAccountId), looseSettledOn, Number(looseSettledValue));
       setLooseAccountId("none");
+      setLooseSettledValue("");
       return;
     }
 
@@ -269,7 +289,7 @@ export default function PaymentsPage() {
       return;
     }
 
-    await submitPayLooseExpenses(Number(looseAccountId));
+    await submitPayLooseExpenses(Number(looseAccountId), looseSettledOn);
     setLooseAccountId("none");
   }
 
@@ -567,6 +587,8 @@ export default function PaymentsPage() {
                             variant="outline"
                             onClick={() => {
                               setLooseAccountId("none");
+                              setLooseSettledOn(localDateISO());
+                              setLooseSettledValue("");
                               setConfirmation({
                                 kind: "loose-expenses",
                                 count: looseExpenses.transactions_count,
@@ -623,6 +645,8 @@ export default function PaymentsPage() {
                                   size="sm"
                                   onClick={() => {
                                     setLooseAccountId(transaction.account?.id ? String(transaction.account.id) : "none");
+                                    setLooseSettledOn(localDateISO());
+                                    setLooseSettledValue(String(transaction.value));
                                     setConfirmation({
                                       kind: "loose-expense",
                                       transactionId: transaction.id,
@@ -873,6 +897,18 @@ export default function PaymentsPage() {
                       </div>
                     )}
                     <p className="text-xs text-neutral-500">A despesa só reduzirá o saldo e entrará no extrato depois deste pagamento.</p>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="space-y-1">
+                        <label className="text-sm font-medium text-neutral-700">Data efetiva</label>
+                        <input type="date" value={looseSettledOn} onChange={(event) => setLooseSettledOn(event.target.value)} className="h-11 w-full rounded-xl border border-neutral-200 bg-white px-3" />
+                      </div>
+                      {confirmation.kind === "loose-expense" && (
+                        <div className="space-y-1">
+                          <label className="text-sm font-medium text-neutral-700">Valor efetivamente pago</label>
+                          <input type="number" min="0.01" step="0.01" value={looseSettledValue} onChange={(event) => setLooseSettledValue(event.target.value)} className="h-11 w-full rounded-xl border border-neutral-200 bg-white px-3" />
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
 

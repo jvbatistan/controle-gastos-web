@@ -91,4 +91,26 @@ describe("TransactionTable", () => {
     expect(screen.getAllByText(/\+\s*R\$\s*6,92/).length).toBeGreaterThan(0);
     expect(screen.getAllByTitle("Estorno / crédito").length).toBeGreaterThan(0);
   });
+
+  it.each([
+    ["open expense", { paid: false, settled_value: null }, /R\$\s*32,90/],
+    ["paid expense with a lower settled value", { paid: true, settled_value: 149.26, value: 150 }, /R\$\s*149,26/],
+    ["paid expense with a higher settled value", { paid: true, settled_value: 158.43, value: 150 }, /R\$\s*158,43/],
+    ["paid historical expense without settlement", { paid: true, settled_value: null, value: 150 }, /R\$\s*150,00/],
+  ])("shows the correct main amount for a %s", (_scenario, changes, expected) => {
+    render(<TransactionTable items={[{ ...baseTransaction, ...changes }]} loading={false} />);
+
+    expect(screen.getAllByText(expected).length).toBeGreaterThan(0);
+  });
+
+  it("keeps the due value as the main amount for card purchases", () => {
+    render(
+      <TransactionTable
+        items={[{ ...baseTransaction, source: "card", card: { id: 7, name: "NUBANK" }, paid: true, value: 150, settled_value: 149.26 }]}
+        loading={false}
+      />
+    );
+
+    expect(screen.getAllByText(/R\$\s*150,00/).length).toBeGreaterThan(0);
+  });
 });
