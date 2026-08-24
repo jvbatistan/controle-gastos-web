@@ -65,7 +65,9 @@ function formatBRL(value: number) {
 function getValueDisplay(transaction: Transaction) {
   const isRefund = Boolean(transaction.refund);
   const isCredit = transaction.kind === "income" || isRefund;
-  const amount = Math.abs(Number(transaction.value || transaction.signed_value || 0));
+  const hasSettledValue = transaction.settled_value !== null && transaction.settled_value !== undefined;
+  const usesSettledValue = transaction.kind === "expense" && transaction.paid && hasSettledValue && (transaction.source === "cash" || transaction.source === "bank");
+  const amount = Math.abs(Number(usesSettledValue ? transaction.settled_value : transaction.value || transaction.signed_value || 0));
 
   return {
     amount,

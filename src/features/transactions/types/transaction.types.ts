@@ -27,6 +27,8 @@ export type Transaction = {
   refund?: boolean;
   date: string;
   purchase_date?: string | null;
+  settled_on?: string | null;
+  settled_value?: number | null;
   kind: "income" | "expense";
   source?: "card" | "cash" | "bank";
   paid: boolean;
@@ -61,6 +63,8 @@ export type TransactionPayload = {
   refund?: boolean;
   date: string;
   purchase_date?: string | null;
+  settled_on?: string | null;
+  settled_value?: number | null;
   kind: "income" | "expense";
   source: "card" | "cash" | "bank";
   paid: boolean;

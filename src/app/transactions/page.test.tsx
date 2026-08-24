@@ -262,6 +262,34 @@ describe("TransactionsPage", () => {
     });
   });
 
+  it("opens transaction details with the recorded due and settled values", async () => {
+    const user = userEvent.setup();
+    useTransactions.mockReturnValue({
+      ...useTransactions(),
+      items: [{
+        ...useTransactions().items[0],
+        source: "bank",
+        card: null,
+        account: { id: 3, name: "Conta Corrente" },
+        value: 150,
+        original_value: 160,
+        purchase_date: "2026-03-10",
+        settled_on: "2026-03-20",
+        settled_value: 149.26,
+        paid: true,
+      }],
+    });
+
+    render(<TransactionsPage />);
+
+    await user.click(getFirstActionTrigger()!);
+    await user.click(screen.getByRole("menuitem", { name: /Ver detalhes/i }));
+
+    expect(screen.getByRole("dialog", { name: "Detalhes da Transação" })).toBeInTheDocument();
+    expect(screen.getByText("Valor devido").parentElement).toHaveTextContent(/R\$\s*150,00/);
+    expect(screen.getByText("Valor efetivamente pago").parentElement).toHaveTextContent(/R\$\s*149,26/);
+  });
+
   it("archives the transaction when the user confirms", async () => {
     const user = userEvent.setup();
 

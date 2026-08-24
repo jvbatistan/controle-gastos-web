@@ -1,6 +1,7 @@
 export { TransactionFilters } from "./components/TransactionFilters";
 export { TransactionStats } from "./components/TransactionStats";
 export { TransactionTable } from "./components/TransactionTable";
+export { TransactionDetailsDialog } from "./components/TransactionDetailsDialog";
 export { TransactionCreateForm } from "./components/TransactionCreateForm";
 
 export { useTransactions } from "./hooks/useTransactions";

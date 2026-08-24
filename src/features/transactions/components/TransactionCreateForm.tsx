@@ -56,17 +56,26 @@ function toCurrencyInput(value?: number | null) {
   });
 }
 
+function localDateISO() {
+  const today = new Date();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+  return `${today.getFullYear()}-${month}-${day}`;
+}
+
 function buildFormState(initialTransaction?: Transaction | null) {
   return {
     kind: initialTransaction?.kind ?? ("expense" as const),
     description: initialTransaction?.description ?? "",
     value: toCurrencyInput(initialTransaction?.value),
     refund: initialTransaction?.refund ?? false,
-    date: initialTransaction?.date ?? new Date().toISOString().slice(0, 10),
+    date: initialTransaction?.date ?? localDateISO(),
     source: initialTransaction?.source ?? ("cash" as const),
     cardId: initialTransaction?.card?.id ? String(initialTransaction.card.id) : "none",
     accountId: initialTransaction?.account?.id ? String(initialTransaction.account.id) : "none",
     paid: initialTransaction?.paid ?? false,
+    settledOn: initialTransaction?.settled_on ?? initialTransaction?.date ?? localDateISO(),
+    settledValue: toCurrencyInput(initialTransaction?.settled_value ?? initialTransaction?.value),
     note: initialTransaction?.note ?? "",
     hasInstallments: Boolean(initialTransaction?.installment_group_id),
     installmentNumber: String(initialTransaction?.installment_number ?? 1),
@@ -100,6 +109,8 @@ function TransactionCreateFormFields({
   const [cardId, setCardId] = useState(initialState.cardId);
   const [accountId, setAccountId] = useState(initialState.accountId);
   const [paid, setPaid] = useState(initialState.paid);
+  const [settledOn, setSettledOn] = useState(initialState.settledOn);
+  const [settledValue, setSettledValue] = useState(initialState.settledValue);
   const [hasInstallments, setHasInstallments] = useState(initialState.hasInstallments);
   const [installmentNumber, setInstallmentNumber] = useState(initialState.installmentNumber);
   const [installmentsCount, setInstallmentsCount] = useState(initialState.installmentsCount);
@@ -140,6 +151,7 @@ function TransactionCreateFormFields({
 
     const normalizedDescription = description.trim();
     const normalizedValue = parseCurrencyInput(value);
+    const normalizedSettledValue = parseCurrencyInput(settledValue);
     const normalizedInstallmentNumber = Number(installmentNumber);
     const normalizedInstallmentsCount = Number(installmentsCount);
     const effectiveSource = isIncome && source === "card" ? "bank" : source;
@@ -158,6 +170,11 @@ function TransactionCreateFormFields({
 
     if (requiresAccount && accountId === "none") {
       setError(isIncome ? "Selecione a conta onde o dinheiro entrou." : "Selecione a conta usada no pagamento.");
+      return;
+    }
+
+    if (!isIncome && effectiveSource !== "card" && paid && (!settledOn || !(normalizedSettledValue > 0))) {
+      setError("Preencha a data e o valor efetivamente pagos.");
       return;
     }
 
@@ -184,6 +201,8 @@ function TransactionCreateFormFields({
       kind,
       source: isIncome ? effectiveSource === "cash" ? "cash" : "bank" : effectiveSource,
       paid: isIncome ? true : paid,
+      settled_on: !isIncome && effectiveSource !== "card" && paid ? settledOn : null,
+      settled_value: !isIncome && effectiveSource !== "card" && paid ? normalizedSettledValue : null,
       note: note.trim() || undefined,
       card_id: !isIncome && effectiveSource === "card" && cardId !== "none" ? Number(cardId) : null,
       account_id: showsAccountField && accountId !== "none" ? Number(accountId) : null,
@@ -202,6 +221,8 @@ function TransactionCreateFormFields({
       setCardId(nextState.cardId);
       setAccountId(nextState.accountId);
       setPaid(nextState.paid);
+      setSettledOn(nextState.settledOn);
+      setSettledValue(nextState.settledValue);
       setHasInstallments(nextState.hasInstallments);
       setInstallmentNumber(nextState.installmentNumber);
       setInstallmentsCount(nextState.installmentsCount);
@@ -388,12 +409,32 @@ function TransactionCreateFormFields({
               <input
                 type="checkbox"
                 checked={paid}
-                onChange={(e) => setPaid(e.target.checked)}
+                onChange={(e) => {
+                  const nextPaid = e.target.checked;
+                  setPaid(nextPaid);
+                  if (nextPaid) {
+                    setSettledOn((current) => current || date);
+                    setSettledValue((current) => current || value);
+                  }
+                }}
                 disabled={loading}
                 className="h-4 w-4 rounded border-neutral-300"
               />
               Marcar como paga
             </label>
+          )}
+
+          {!isIncome && source !== "card" && paid && (
+            <div className="grid gap-4 md:col-span-2 md:grid-cols-2">
+              <div className="space-y-2">
+                <FieldLabel>Data efetiva do pagamento</FieldLabel>
+                <Input type="date" value={settledOn} onChange={(e) => setSettledOn(e.target.value)} disabled={loading} className="h-11 rounded-xl bg-white" />
+              </div>
+              <div className="space-y-2">
+                <FieldLabel>Valor efetivamente pago (R$)</FieldLabel>
+                <Input type="text" inputMode="decimal" value={settledValue} onChange={(e) => setSettledValue(formatCurrencyInput(e.target.value))} disabled={loading} className="h-11 rounded-xl bg-white" />
+              </div>
+            </div>
           )}
         </div>
       </section>
