@@ -9,6 +9,7 @@ export type PaymentStatement = {
   paid_amount: number;
   remaining_amount: number;
   paid: boolean;
+  payment_status?: "open" | "partially_paid" | "paid";
   paid_at?: string | null;
   ignored_at?: string | null;
   payments?: CardStatementPayment[];

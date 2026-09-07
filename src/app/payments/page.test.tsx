@@ -142,18 +142,20 @@ beforeEach(() => {
 });
 
 describe("PaymentsPage", () => {
-  it("pays a card statement and refreshes the overview", async () => {
+  it("registers a partial statement payment and refreshes the overview", async () => {
     const user = userEvent.setup();
     render(<PaymentsPage />);
 
-    await user.click(screen.getByRole("button", { name: /Pagar fatura/i }));
+    await user.click(screen.getByRole("button", { name: /Registrar pagamento/i }));
+    await user.clear(screen.getByLabelText("Valor do pagamento"));
+    await user.type(screen.getByLabelText("Valor do pagamento"), "100");
     await user.selectOptions(screen.getByDisplayValue("Selecione a conta de onde saiu o dinheiro"), "3");
-    await user.click(screen.getByRole("button", { name: /Confirmar pagamento da fatura/i }));
+    await user.click(screen.getByRole("button", { name: /Registrar pagamento da fatura/i }));
 
     await waitFor(() => {
-      expect(payCardStatement).toHaveBeenCalledWith(1, { accountId: 3 });
+      expect(payCardStatement).toHaveBeenCalledWith(1, { accountId: 3, amount: 100 });
       expect(refetch).toHaveBeenCalled();
-      expect(screen.getByText('Fatura do cartão "NUBANK" quitada com sucesso.')).toBeInTheDocument();
+      expect(screen.getByText('Pagamento da fatura do cartão "NUBANK" registrado com sucesso.')).toBeInTheDocument();
     });
   });
 
@@ -161,8 +163,8 @@ describe("PaymentsPage", () => {
     const user = userEvent.setup();
     render(<PaymentsPage />);
 
-    await user.click(screen.getByRole("button", { name: /Pagar fatura/i }));
-    await user.click(screen.getByRole("button", { name: /Confirmar pagamento da fatura/i }));
+    await user.click(screen.getByRole("button", { name: /Registrar pagamento/i }));
+    await user.click(screen.getByRole("button", { name: /Registrar pagamento da fatura/i }));
 
     expect(screen.getByText("Selecione a conta de onde saiu o pagamento da fatura.")).toBeInTheDocument();
     expect(payCardStatement).not.toHaveBeenCalled();
@@ -174,9 +176,9 @@ describe("PaymentsPage", () => {
 
     render(<PaymentsPage />);
 
-    await user.click(screen.getByRole("button", { name: /Pagar fatura/i }));
+    await user.click(screen.getByRole("button", { name: /Registrar pagamento/i }));
     await user.selectOptions(screen.getByDisplayValue("Selecione a conta de onde saiu o dinheiro"), "3");
-    await user.click(screen.getByRole("button", { name: /Confirmar pagamento da fatura/i }));
+    await user.click(screen.getByRole("button", { name: /Registrar pagamento da fatura/i }));
 
     expect(await screen.findByText("Conta não encontrada.")).toBeInTheDocument();
   });
@@ -192,11 +194,11 @@ describe("PaymentsPage", () => {
 
     render(<PaymentsPage />);
 
-    await user.click(screen.getByRole("button", { name: /Pagar fatura/i }));
+    await user.click(screen.getByRole("button", { name: /Registrar pagamento/i }));
 
     expect(screen.getByText("Nenhuma conta cadastrada. Crie uma conta antes de pagar faturas.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Criar conta" })).toHaveAttribute("href", "/accounts");
-    expect(screen.getByRole("button", { name: /Confirmar pagamento da fatura/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Registrar pagamento da fatura/i })).toBeDisabled();
   });
 
   it("shows the account in statement payment history when available", () => {
@@ -260,6 +262,7 @@ describe("PaymentsPage", () => {
   it("shows statement payment history", () => {
     render(<PaymentsPage />);
 
+    expect(screen.getByText("Parcialmente paga")).toBeInTheDocument();
     expect(screen.getByText("Pagamentos registrados")).toBeInTheDocument();
     expect(screen.getByText(/Pagamento recebido/i)).toBeInTheDocument();
     expect(screen.getByText("R$ 30,00")).toBeInTheDocument();

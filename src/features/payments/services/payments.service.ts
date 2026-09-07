@@ -32,7 +32,7 @@ export async function payCardStatement(statementId: number, payload: PayCardStat
     const data = (await api(`/api/payments/card_statements/${statementId}/pay`, {
       method: "POST",
       body: JSON.stringify({
-        ...(payload.amount ? { amount: payload.amount } : {}),
+        ...(payload.amount !== undefined ? { amount: payload.amount } : {}),
         account_id: payload.accountId,
       }),
       cache: "no-store",
