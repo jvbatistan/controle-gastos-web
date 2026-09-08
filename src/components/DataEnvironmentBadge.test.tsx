@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { DataEnvironmentBanner } from "@/components/DataEnvironmentBanner";
+import { DataEnvironmentBadge } from "@/components/DataEnvironmentBadge";
 
 const useDataEnvironment = vi.fn();
 
@@ -7,30 +7,28 @@ vi.mock("@/lib/data-environment-context", () => ({
   useDataEnvironment: () => useDataEnvironment(),
 }));
 
-describe("DataEnvironmentBanner", () => {
-  it("shows a strong permanent warning for Supabase", () => {
+describe("DataEnvironmentBadge", () => {
+  it("shows a compact red warning for Supabase", () => {
     useDataEnvironment.mockReturnValue({
       status: "ready",
       data: { environment: "supabase" },
     });
 
-    render(<DataEnvironmentBanner />);
+    render(<DataEnvironmentBadge />);
 
     expect(screen.getByRole("status", { name: "Ambiente de dados atual" })).toHaveTextContent(
-      "DADOS REAIS — SUPABASE"
+      "DADOS REAIS · SUPABASE"
     );
   });
 
-  it("identifies the local environment as test data", () => {
+  it("shows a discreet local test badge", () => {
     useDataEnvironment.mockReturnValue({
       status: "ready",
       data: { environment: "local" },
     });
 
-    render(<DataEnvironmentBanner />);
+    render(<DataEnvironmentBadge />);
 
-    expect(screen.getByRole("status", { name: "Ambiente de dados atual" })).toHaveTextContent(
-      "AMBIENTE DE TESTE — LOCAL"
-    );
+    expect(screen.getByRole("status", { name: "Ambiente de dados atual" })).toHaveTextContent("LOCAL · TESTE");
   });
 });

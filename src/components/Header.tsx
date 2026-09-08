@@ -6,7 +6,7 @@ import { logout } from "@/lib/auth";
 import { useAuth } from "@/lib/useAuth";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { DataEnvironmentBanner } from "@/components/DataEnvironmentBanner";
+import { DataEnvironmentBadge } from "@/components/DataEnvironmentBadge";
 import { useDataEnvironment } from "@/lib/data-environment-context";
 import {
   DropdownMenu,
@@ -40,7 +40,6 @@ export function Header({ onNewTransactionClick, onMenuClick, fluid = false }: He
 
   return (
     <header className="sticky top-0 z-50 border-b border-neutral-200 bg-white">
-      <DataEnvironmentBanner />
       <div
         className={[
           "flex w-full items-center justify-between gap-4 px-4 py-3 sm:px-6 md:py-4",
@@ -81,6 +80,8 @@ export function Header({ onNewTransactionClick, onMenuClick, fluid = false }: He
         </div>
 
         <div className="flex items-center gap-2">
+          <DataEnvironmentBadge />
+
           {onNewTransactionClick && (
             <button
               type="button"
