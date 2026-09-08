@@ -100,6 +100,7 @@ export default function PaymentsPage() {
   const [looseSettledOn, setLooseSettledOn] = useState(localDateISO);
   const [looseSettledValue, setLooseSettledValue] = useState("");
   const [looseSettle, setLooseSettle] = useState(false);
+  const [confirmationError, setConfirmationError] = useState<string | null>(null);
 
   const handleUnauthorized = useCallback(() => router.replace("/login"), [router]);
 
@@ -155,15 +156,18 @@ export default function PaymentsPage() {
     try {
       setSubmittingKey(`statement-${statementId}`);
       setMessage(null);
+      setConfirmationError(null);
       const result = await payCardStatement(statementId, { accountId, amount });
       if (result.status === 401) {
         handleUnauthorized();
-        return;
+        return false;
       }
       setMessage(result.data?.paid ? `Fatura do cartão "${result.data?.card.name}" quitada com sucesso.` : `Pagamento da fatura do cartão "${result.data?.card.name}" registrado com sucesso.`);
       await refetch();
+      return true;
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Não foi possível registrar o pagamento da fatura.");
+      setConfirmationError(err instanceof Error ? err.message : "Não foi possível registrar o pagamento da fatura.");
+      return false;
     } finally {
       setSubmittingKey(null);
     }
@@ -191,15 +195,18 @@ export default function PaymentsPage() {
     try {
       setSubmittingKey(`loose-expense-${transactionId}`);
       setMessage(null);
+      setConfirmationError(null);
       const result = await payLooseExpense(transactionId, Number(month), Number(year), accountId, settledOn, settledValue, settle);
       if (result.status === 401) {
         handleUnauthorized();
-        return;
+        return false;
       }
       setMessage(settle ? `Despesa "${description}" quitada.` : `Pagamento parcial da despesa "${description}" registrado.`);
       await refetch();
+      return true;
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Não foi possível quitar a despesa avulsa.");
+      setConfirmationError(err instanceof Error ? err.message : "Não foi possível quitar a despesa avulsa.");
+      return false;
     } finally {
       setSubmittingKey(null);
     }
@@ -227,15 +234,18 @@ export default function PaymentsPage() {
     try {
       setSubmittingKey("loose-expenses");
       setMessage(null);
+      setConfirmationError(null);
       const result = await payLooseExpenses(Number(month), Number(year), accountId, settledOn);
       if (result.status === 401) {
         handleUnauthorized();
-        return;
+        return false;
       }
       setMessage(`${result.data?.paid_transactions_count ?? 0} despesas avulsas marcadas como pagas.`);
       await refetch();
+      return true;
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Não foi possível quitar as despesas avulsas.");
+      setConfirmationError(err instanceof Error ? err.message : "Não foi possível quitar as despesas avulsas.");
+      return false;
     } finally {
       setSubmittingKey(null);
     }
@@ -247,36 +257,36 @@ export default function PaymentsPage() {
     const current = confirmation;
 
     if (current.kind === "statement" && statementAccountId === "none") {
-      setMessage("Selecione a conta de onde saiu o pagamento da fatura.");
+      setConfirmationError("Selecione a conta de onde saiu o pagamento da fatura.");
       return;
     }
 
     if (current.kind === "statement" && (!(Number(statementPaymentAmount) > 0) || Number(statementPaymentAmount) > current.amount)) {
-      setMessage(`Informe um valor maior que zero e de até ${formatBRL(current.amount)}.`);
+      setConfirmationError(`Informe um valor maior que zero e de até ${formatBRL(current.amount)}.`);
       return;
     }
 
     if ((current.kind === "loose-expense" || current.kind === "loose-expenses") && looseAccountId === "none") {
-      setMessage("Selecione a conta usada no pagamento da despesa.");
+      setConfirmationError("Selecione a conta usada no pagamento da despesa.");
       return;
     }
 
     if ((current.kind === "loose-expense" || current.kind === "loose-expenses") && !looseSettledOn) {
-      setMessage("Informe a data efetiva do pagamento.");
+      setConfirmationError("Informe a data efetiva do pagamento.");
       return;
     }
 
     if (current.kind === "loose-expense" && !(Number(looseSettledValue) > 0)) {
-      setMessage("Informe o valor efetivamente pago.");
+      setConfirmationError("Informe o valor efetivamente pago.");
       return;
     }
 
-    setConfirmation(null);
-
     if (current.kind === "statement") {
-      await submitPayStatement(current.statementId, Number(statementAccountId), Number(statementPaymentAmount));
-      setStatementAccountId("none");
-      setStatementPaymentAmount("");
+      if (await submitPayStatement(current.statementId, Number(statementAccountId), Number(statementPaymentAmount))) {
+        setConfirmation(null);
+        setStatementAccountId("none");
+        setStatementPaymentAmount("");
+      }
       return;
     }
 
@@ -286,9 +296,11 @@ export default function PaymentsPage() {
     }
 
     if (current.kind === "loose-expense") {
-      await submitPayLooseExpense(current.transactionId, current.description, Number(looseAccountId), looseSettledOn, Number(looseSettledValue), looseSettle);
-      setLooseAccountId("none");
-      setLooseSettledValue("");
+      if (await submitPayLooseExpense(current.transactionId, current.description, Number(looseAccountId), looseSettledOn, Number(looseSettledValue), looseSettle)) {
+        setConfirmation(null);
+        setLooseAccountId("none");
+        setLooseSettledValue("");
+      }
       return;
     }
 
@@ -297,8 +309,10 @@ export default function PaymentsPage() {
       return;
     }
 
-    await submitPayLooseExpenses(Number(looseAccountId), looseSettledOn);
-    setLooseAccountId("none");
+    if (await submitPayLooseExpenses(Number(looseAccountId), looseSettledOn)) {
+      setConfirmation(null);
+      setLooseAccountId("none");
+    }
   }
 
   if (auth.status !== "authenticated") {
@@ -520,6 +534,7 @@ export default function PaymentsPage() {
                                       setStatementAccountId("none");
                                       setStatementPaymentAmount(String(statement.remaining_amount));
                                       setMessage(null);
+                                      setConfirmationError(null);
                                       setConfirmation({
                                         kind: "statement",
                                         statementId: statement.id,
@@ -599,6 +614,7 @@ export default function PaymentsPage() {
                               setLooseAccountId("none");
                               setLooseSettledOn(localDateISO());
                               setLooseSettledValue("");
+                              setConfirmationError(null);
                               setConfirmation({
                                 kind: "loose-expenses",
                                 count: looseExpenses.transactions_count,
@@ -664,6 +680,7 @@ export default function PaymentsPage() {
                                     setLooseSettledOn(localDateISO());
                                     setLooseSettledValue(String(transaction.remaining_amount ?? transaction.value));
                                     setLooseSettle(false);
+                                    setConfirmationError(null);
                                     setConfirmation({
                                       kind: "loose-expense",
                                       transactionId: transaction.id,
@@ -852,6 +869,7 @@ export default function PaymentsPage() {
                     size="sm"
                     onClick={() => {
                       setConfirmation(null);
+                      setConfirmationError(null);
                       setStatementAccountId("none");
                       setLooseAccountId("none");
                     }}
@@ -866,6 +884,12 @@ export default function PaymentsPage() {
                 <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
                   Essa ação altera o status de pagamento e deve ser confirmada com atenção.
                 </div>
+
+                {confirmationError && (
+                  <p role="alert" className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                    {confirmationError}
+                  </p>
+                )}
 
                 {confirmation.kind === "statement" && (
                   <div className="mt-4 space-y-2">
@@ -957,6 +981,7 @@ export default function PaymentsPage() {
                     variant="outline"
                     onClick={() => {
                       setConfirmation(null);
+                      setConfirmationError(null);
                       setStatementAccountId("none");
                       setLooseAccountId("none");
                     }}
