@@ -64,11 +64,11 @@ export async function payLooseExpenses(month: number, year: number, accountId: n
   }
 }
 
-export async function payLooseExpense(transactionId: number, month: number, year: number, accountId: number, settledOn: string, settledValue: number) {
+export async function payLooseExpense(transactionId: number, month: number, year: number, accountId: number, settledOn: string, amount: number, settle: boolean) {
   try {
     const data = (await api(`/api/payments/loose_expenses/${transactionId}/pay`, {
       method: "POST",
-      body: JSON.stringify({ month, year, account_id: accountId, settled_on: settledOn, settled_value: settledValue }),
+      body: JSON.stringify({ month, year, account_id: accountId, settled_on: settledOn, amount, settle }),
       cache: "no-store",
     })) as LooseExpenseTransaction;
 

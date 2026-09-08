@@ -55,4 +55,32 @@ describe("TransactionDetailsDialog", () => {
     expect(screen.getByText("Cartão", { selector: "dt" }).parentElement).toHaveTextContent("NUBANK");
     expect(screen.queryByText("Diferença no pagamento")).not.toBeInTheDocument();
   });
+
+  it("shows canonical payment history and preserves a negative nominal remaining amount", () => {
+    render(
+      <TransactionDetailsDialog
+        transaction={{
+          ...transaction,
+          settled_on: null,
+          settled_value: null,
+          value: 1000,
+          paid: true,
+          payments_total: 1050,
+          remaining_amount: -50,
+          payment_status: "paid",
+          payments: [
+            { id: 1, amount: 300, settled_on: "2026-09-05", account: { id: 3, name: "Conta A" } },
+            { id: 2, amount: 750, settled_on: "2026-09-10", account: { id: 4, name: "Conta B" } },
+          ],
+        }}
+        onClose={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText("Status do pagamento").parentElement).toHaveTextContent("Paga");
+    expect(screen.getByText("Total realizado").parentElement).toHaveTextContent(/R\$\s*1\.050,00/);
+    expect(screen.getByText("Saldo nominal restante").parentElement).toHaveTextContent(/-R\$\s*50,00/);
+    expect(screen.getByText("Pagamentos registrados").parentElement).toHaveTextContent("05/09/2026 · Conta A");
+    expect(screen.getByText("Pagamentos registrados").parentElement).toHaveTextContent("10/09/2026 · Conta B");
+  });
 });

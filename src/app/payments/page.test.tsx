@@ -180,7 +180,38 @@ describe("PaymentsPage", () => {
     await user.selectOptions(screen.getByDisplayValue("Selecione a conta de onde saiu o dinheiro"), "3");
     await user.click(screen.getByRole("button", { name: /Registrar pagamento da fatura/i }));
 
-    expect(await screen.findByText("Conta não encontrada.")).toBeInTheDocument();
+    expect(await screen.findByRole("alert")).toHaveTextContent("Conta não encontrada.");
+    expect(screen.getByRole("button", { name: /Registrar pagamento da fatura/i })).toBeEnabled();
+  });
+
+  it("keeps the loose-expense payment modal open after insufficient funds and allows a retry with another account", async () => {
+    const user = userEvent.setup();
+    useAccounts.mockReturnValue({
+      accounts: [{ id: 3, name: "Conta sem saldo" }, { id: 4, name: "Conta com saldo" }],
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    payLooseExpense
+      .mockRejectedValueOnce(new Error("Saldo insuficiente na conta Conta sem saldo."))
+      .mockResolvedValueOnce({ status: 200, data: { id: 1, description: "MERCADO", value: 80, date: "2026-03-10", source: "cash", paid: false } });
+
+    render(<PaymentsPage />);
+
+    await user.click(screen.getByRole("button", { name: /Avulsas/i }));
+    await user.click(screen.getAllByRole("button", { name: /Pagar despesa/i })[0]);
+    await user.selectOptions(screen.getByDisplayValue("Selecione a conta de onde saiu o dinheiro"), "3");
+    await user.click(screen.getByRole("button", { name: /Confirmar pagamento da despesa/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Saldo insuficiente na conta Conta sem saldo.");
+    expect(screen.getByRole("button", { name: /Confirmar pagamento da despesa/i })).toBeEnabled();
+    expect(screen.queryByText(/Pagamento parcial da despesa "MERCADO" registrado/)).not.toBeInTheDocument();
+
+    await user.selectOptions(screen.getByDisplayValue("Conta sem saldo"), "4");
+    await user.click(screen.getByRole("button", { name: /Confirmar pagamento da despesa/i }));
+
+    await waitFor(() => expect(payLooseExpense).toHaveBeenLastCalledWith(1, expect.any(Number), expect.any(Number), 4, expect.any(String), 80, false));
+    expect(screen.queryByRole("button", { name: /Confirmar pagamento da despesa/i })).not.toBeInTheDocument();
   });
 
   it("guides the user to create an account when paying a statement without active accounts", async () => {
@@ -309,9 +340,9 @@ describe("PaymentsPage", () => {
     await user.click(screen.getByRole("button", { name: /Confirmar pagamento da despesa/i }));
 
     await waitFor(() => {
-      expect(payLooseExpense).toHaveBeenCalledWith(1, expect.any(Number), expect.any(Number), 3, expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/), 80);
+      expect(payLooseExpense).toHaveBeenCalledWith(1, expect.any(Number), expect.any(Number), 3, expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/), 80, false);
       expect(refetch).toHaveBeenCalled();
-      expect(screen.getByText('Despesa "MERCADO" marcada como paga.')).toBeInTheDocument();
+      expect(screen.getByText('Pagamento parcial da despesa "MERCADO" registrado.')).toBeInTheDocument();
     });
   });
 
@@ -381,12 +412,51 @@ describe("PaymentsPage", () => {
     await user.click(screen.getByRole("button", { name: /Confirmar pagamento da despesa/i }));
 
     await waitFor(() => {
-      expect(payLooseExpense).toHaveBeenCalledWith(1, expect.any(Number), expect.any(Number), 3, expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/), 80);
+      expect(payLooseExpense).toHaveBeenCalledWith(1, expect.any(Number), expect.any(Number), 3, expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/), 80, false);
       expect(batchButton).toBeDisabled();
       expect(itemButtons[0]).toBeDisabled();
       expect(itemButtons[1]).toBeDisabled();
       expect(ignoreButtons[0]).toBeDisabled();
       expect(ignoreButtons[1]).toBeDisabled();
     });
+  });
+
+  it("requires an explicit confirmation to settle with a different realized total", async () => {
+    const user = userEvent.setup();
+    usePayments.mockReturnValue({
+      ...usePayments(),
+      overview: {
+        ...usePayments().overview,
+        loose_expenses: {
+          ...usePayments().overview.loose_expenses,
+          transactions: [{
+            id: 1, description: "MERCADO", value: 1000, date: "2026-03-10", source: "cash", paid: false,
+            payments_total: 300, remaining_amount: 700, payment_status: "partially_paid",
+            payments: [{ id: 11, amount: 300, settled_on: "2026-03-05", account: { id: 3, name: "Conta Corrente" } }],
+          }],
+        },
+      },
+    });
+
+    render(<PaymentsPage />);
+    await user.click(screen.getByRole("button", { name: /Avulsas/i }));
+    await user.click(screen.getByRole("button", { name: /Pagar despesa/i }));
+    await user.selectOptions(screen.getByDisplayValue("Selecione a conta de onde saiu o dinheiro"), "3");
+    await user.clear(screen.getByLabelText("Valor efetivamente pago"));
+    await user.type(screen.getByLabelText("Valor efetivamente pago"), "650");
+    await user.click(screen.getByRole("button", { name: /Confirmar pagamento da despesa/i }));
+
+    expect(payLooseExpense).toHaveBeenCalledWith(1, expect.any(Number), expect.any(Number), 3, expect.any(String), 650, false);
+
+    await user.click(screen.getByRole("button", { name: /Pagar despesa/i }));
+    await user.selectOptions(screen.getByDisplayValue("Selecione a conta de onde saiu o dinheiro"), "3");
+    await user.clear(screen.getByLabelText("Valor efetivamente pago"));
+    await user.type(screen.getByLabelText("Valor efetivamente pago"), "650");
+    await user.click(screen.getByLabelText(/Confirmo que este pagamento quita/i));
+    expect(screen.getByText(/Valor nominal: R\$ 1.000,00/)).toBeInTheDocument();
+    expect(screen.getByText(/diferença nominal será R\$ 50,00/i)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /Confirmar pagamento da despesa/i }));
+
+    await waitFor(() => expect(payLooseExpense).toHaveBeenLastCalledWith(1, expect.any(Number), expect.any(Number), 3, expect.any(String), 650, true));
   });
 });

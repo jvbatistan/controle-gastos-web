@@ -29,6 +29,15 @@ export type Transaction = {
   purchase_date?: string | null;
   settled_on?: string | null;
   settled_value?: number | null;
+  payments_total?: number;
+  remaining_amount?: number;
+  payment_status?: "open" | "partially_paid" | "paid";
+  payments?: Array<{
+    id: number;
+    amount: number;
+    settled_on: string;
+    account: { id: number; name: string };
+  }>;
   kind: "income" | "expense";
   source?: "card" | "cash" | "bank";
   paid: boolean;

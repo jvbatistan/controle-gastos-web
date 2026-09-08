@@ -143,6 +143,7 @@ function TransactionActions({
   onReviewClassification?: (tx: Transaction) => void;
 }) {
   const shouldShowReviewAction = canReviewClassification(transaction);
+  const hasPaymentHistory = (transaction.payments?.length ?? 0) > 0;
 
   return (
     <DropdownMenu>
@@ -162,7 +163,7 @@ function TransactionActions({
             Revisar classificação
           </DropdownMenuItem>
         )}
-        <DropdownMenuItem disabled={!onEdit} onClick={() => onEdit?.(transaction)}>
+        <DropdownMenuItem disabled={!onEdit || hasPaymentHistory} onClick={() => onEdit?.(transaction)}>
           <Pencil className="mr-2 h-4 w-4" />
           Editar
         </DropdownMenuItem>
@@ -171,7 +172,7 @@ function TransactionActions({
           Duplicar (em breve)
         </DropdownMenuItem>
         <DropdownMenuItem
-          disabled={!onDelete}
+          disabled={!onDelete || hasPaymentHistory}
           onClick={() => onDelete?.(transaction)}
           className="text-rose-600"
         >
