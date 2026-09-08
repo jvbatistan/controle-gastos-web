@@ -18,6 +18,10 @@ function formatBRL(value: number) {
   return Math.abs(Number(value)).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+function formatSignedBRL(value: number) {
+  return `${Number(value) < 0 ? "-" : ""}${formatBRL(value)}`;
+}
+
 function sourceLabel(source?: Transaction["source"]) {
   return { bank: "Conta bancária", cash: "Dinheiro", card: "Cartão" }[source ?? ""] ?? "—";
 }
@@ -40,12 +44,20 @@ function paymentDifference(settledValue: number, dueValue: number) {
   return `${difference < 0 ? "-" : "+"}${formatBRL(difference)} — ${direction}`;
 }
 
+function paymentStatusLabel(status: Transaction["payment_status"], paid: boolean) {
+  if (status === "partially_paid") return "Parcialmente paga";
+  if (status === "paid" || paid) return "Paga";
+  return "Em aberto";
+}
+
 export function TransactionDetailsDialog({ transaction, onClose }: TransactionDetailsDialogProps) {
   if (!transaction) return null;
 
   const hasSettledValue = transaction.settled_value !== null && transaction.settled_value !== undefined;
   const hasSettledOn = Boolean(transaction.settled_on);
   const hasPaymentDifference = hasSettledValue && transaction.kind === "expense" && (transaction.source === "cash" || transaction.source === "bank");
+  const hasPayments = (transaction.payments?.length ?? 0) > 0;
+  const isLooseExpense = transaction.kind === "expense" && (transaction.source === "cash" || transaction.source === "bank");
 
   return (
     <div className="fixed inset-0 z-[60] overflow-y-auto bg-black/40 px-4 py-4" role="dialog" aria-modal="true" aria-labelledby="transaction-details-title">
@@ -72,9 +84,28 @@ export function TransactionDetailsDialog({ transaction, onClose }: TransactionDe
               <DetailRow label="Valor original" value={formatBRL(transaction.original_value)} />
             )}
             <DetailRow label="Valor devido" value={formatBRL(transaction.value)} />
+            {isLooseExpense && (
+              <>
+                <DetailRow label="Status do pagamento" value={paymentStatusLabel(transaction.payment_status, transaction.paid)} />
+                <DetailRow label="Total realizado" value={formatBRL(transaction.payments_total ?? (transaction.settled_value ?? 0))} />
+                <DetailRow label="Saldo nominal restante" value={formatSignedBRL(transaction.remaining_amount ?? (transaction.value - (transaction.settled_value ?? 0)))} />
+              </>
+            )}
             {hasSettledValue && <DetailRow label="Valor efetivamente pago" value={formatBRL(transaction.settled_value!)} />}
             {hasPaymentDifference && (
               <DetailRow label="Diferença no pagamento" value={paymentDifference(transaction.settled_value!, transaction.value)} />
+            )}
+            {hasPayments && (
+              <div className="border-b border-neutral-100 py-3 last:border-b-0">
+                <dt className="text-sm text-neutral-500">Pagamentos registrados</dt>
+                <dd className="mt-2 space-y-2">
+                  {transaction.payments!.map((payment) => (
+                    <div key={payment.id} className="rounded-lg bg-neutral-50 px-3 py-2 text-sm text-neutral-800">
+                      {formatDateBR(payment.settled_on)} · {payment.account.name} · {formatBRL(payment.amount)}
+                    </div>
+                  ))}
+                </dd>
+              </div>
             )}
           </dl>
         </div>

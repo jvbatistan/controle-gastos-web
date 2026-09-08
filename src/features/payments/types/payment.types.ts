@@ -50,6 +50,10 @@ export type LooseExpenseTransaction = {
     name: string;
   } | null;
   paid: boolean;
+  payments_total?: number;
+  remaining_amount?: number;
+  payment_status?: "open" | "partially_paid" | "paid";
+  payments?: Array<{ id: number; amount: number; settled_on: string; account: { id: number; name: string } }>;
   payment_ignored_at?: string | null;
 };
 

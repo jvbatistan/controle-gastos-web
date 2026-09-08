@@ -81,7 +81,7 @@ function renderInstallmentLabel(transaction: {
 type PaymentConfirmation =
   | { kind: "statement"; statementId: number; cardName: string; amount: number }
   | { kind: "ignore-statement"; statementId: number; cardName: string; amount: number; period: string }
-  | { kind: "loose-expense"; transactionId: number; description: string; amount: number }
+  | { kind: "loose-expense"; transactionId: number; description: string; amount: number; paymentsTotal: number; remainingAmount: number }
   | { kind: "ignore-loose-expense"; transactionId: number; description: string; amount: number; period: string }
   | { kind: "loose-expenses"; count: number; totalAmount: number; period: string };
 
@@ -99,6 +99,7 @@ export default function PaymentsPage() {
   const [looseAccountId, setLooseAccountId] = useState("none");
   const [looseSettledOn, setLooseSettledOn] = useState(localDateISO);
   const [looseSettledValue, setLooseSettledValue] = useState("");
+  const [looseSettle, setLooseSettle] = useState(false);
 
   const handleUnauthorized = useCallback(() => router.replace("/login"), [router]);
 
@@ -186,16 +187,16 @@ export default function PaymentsPage() {
     }
   }
 
-  async function submitPayLooseExpense(transactionId: number, description: string, accountId: number, settledOn: string, settledValue: number) {
+  async function submitPayLooseExpense(transactionId: number, description: string, accountId: number, settledOn: string, settledValue: number, settle: boolean) {
     try {
       setSubmittingKey(`loose-expense-${transactionId}`);
       setMessage(null);
-      const result = await payLooseExpense(transactionId, Number(month), Number(year), accountId, settledOn, settledValue);
+      const result = await payLooseExpense(transactionId, Number(month), Number(year), accountId, settledOn, settledValue, settle);
       if (result.status === 401) {
         handleUnauthorized();
         return;
       }
-      setMessage(`Despesa "${description}" marcada como paga.`);
+      setMessage(settle ? `Despesa "${description}" quitada.` : `Pagamento parcial da despesa "${description}" registrado.`);
       await refetch();
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Não foi possível quitar a despesa avulsa.");
@@ -285,7 +286,7 @@ export default function PaymentsPage() {
     }
 
     if (current.kind === "loose-expense") {
-      await submitPayLooseExpense(current.transactionId, current.description, Number(looseAccountId), looseSettledOn, Number(looseSettledValue));
+      await submitPayLooseExpense(current.transactionId, current.description, Number(looseAccountId), looseSettledOn, Number(looseSettledValue), looseSettle);
       setLooseAccountId("none");
       setLooseSettledValue("");
       return;
@@ -643,6 +644,12 @@ export default function PaymentsPage() {
                               {transaction.note && (
                                 <div className="mt-1 text-xs text-neutral-500">{transaction.note}</div>
                               )}
+                              {transaction.payment_status === "partially_paid" && (
+                                <div className="mt-1 text-xs font-medium text-amber-700">Parcialmente paga · Pago {formatBRL(Number(transaction.payments_total ?? 0))} · Saldo {formatBRL(Number(transaction.remaining_amount ?? transaction.value))}</div>
+                              )}
+                              {(transaction.payments?.length ?? 0) > 0 && (
+                                <div className="mt-1 space-y-1 text-xs text-neutral-500">{transaction.payments?.map((payment) => <div key={payment.id}>{formatDateBR(payment.settled_on)} · {payment.account.name} · {formatBRL(payment.amount)}</div>)}</div>
+                              )}
                             </div>
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
                               <div className="text-right">
@@ -655,12 +662,15 @@ export default function PaymentsPage() {
                                   onClick={() => {
                                     setLooseAccountId(transaction.account?.id ? String(transaction.account.id) : "none");
                                     setLooseSettledOn(localDateISO());
-                                    setLooseSettledValue(String(transaction.value));
+                                    setLooseSettledValue(String(transaction.remaining_amount ?? transaction.value));
+                                    setLooseSettle(false);
                                     setConfirmation({
                                       kind: "loose-expense",
                                       transactionId: transaction.id,
                                       description: transaction.description,
                                       amount: Number(transaction.value),
+                                      paymentsTotal: Number(transaction.payments_total ?? 0),
+                                      remainingAmount: Number(transaction.remaining_amount ?? transaction.value),
                                     });
                                   }}
                                   disabled={isSubmittingLooseExpenses}
@@ -913,16 +923,31 @@ export default function PaymentsPage() {
                     <p className="text-xs text-neutral-500">A despesa só reduzirá o saldo e entrará no extrato depois deste pagamento.</p>
                     <div className="grid gap-3 sm:grid-cols-2">
                       <div className="space-y-1">
-                        <label className="text-sm font-medium text-neutral-700">Data efetiva</label>
-                        <input type="date" value={looseSettledOn} onChange={(event) => setLooseSettledOn(event.target.value)} className="h-11 w-full rounded-xl border border-neutral-200 bg-white px-3" />
+                        <label htmlFor="loose-settled-on" className="text-sm font-medium text-neutral-700">Data efetiva</label>
+                        <input id="loose-settled-on" type="date" value={looseSettledOn} onChange={(event) => setLooseSettledOn(event.target.value)} className="h-11 w-full rounded-xl border border-neutral-200 bg-white px-3" />
                       </div>
                       {confirmation.kind === "loose-expense" && (
                         <div className="space-y-1">
-                          <label className="text-sm font-medium text-neutral-700">Valor efetivamente pago</label>
-                          <input type="number" min="0.01" step="0.01" value={looseSettledValue} onChange={(event) => setLooseSettledValue(event.target.value)} className="h-11 w-full rounded-xl border border-neutral-200 bg-white px-3" />
+                          <label htmlFor="loose-settled-value" className="text-sm font-medium text-neutral-700">Valor efetivamente pago</label>
+                          <input id="loose-settled-value" type="number" min="0.01" step="0.01" value={looseSettledValue} onChange={(event) => setLooseSettledValue(event.target.value)} className="h-11 w-full rounded-xl border border-neutral-200 bg-white px-3" />
                         </div>
                       )}
                     </div>
+                    {confirmation.kind === "loose-expense" && (
+                      <label className="flex items-center gap-2 text-sm text-neutral-700">
+                        <input type="checkbox" checked={looseSettle} onChange={(event) => setLooseSettle(event.target.checked)} />
+                        Confirmo que este pagamento quita a despesa
+                      </label>
+                    )}
+                    {confirmation.kind === "loose-expense" && looseSettle && (
+                      <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                        <p>Valor nominal: {formatBRL(confirmation.amount)} · Já realizado: {formatBRL(confirmation.paymentsTotal)}</p>
+                        <p>Este pagamento: {formatBRL(Number(looseSettledValue) || 0)} · Total realizado: {formatBRL(confirmation.paymentsTotal + (Number(looseSettledValue) || 0))}</p>
+                        {confirmation.paymentsTotal + (Number(looseSettledValue) || 0) !== confirmation.amount && (
+                          <p className="mt-1 font-medium">A diferença nominal será {formatBRL(Math.abs(confirmation.amount - confirmation.paymentsTotal - (Number(looseSettledValue) || 0)))}. Confirme somente se ela for intencional.</p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
 
