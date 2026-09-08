@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { Bell, Menu, Plus, Settings, User, LogOut, Hammer } from "lucide-react";
+import { Bell, Menu, Plus, Settings, User, LogOut } from "lucide-react";
 import { logout } from "@/lib/auth";
 import { useAuth } from "@/lib/useAuth";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { DataEnvironmentBanner } from "@/components/DataEnvironmentBanner";
+import { useDataEnvironment } from "@/lib/data-environment-context";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,10 +26,12 @@ type HeaderProps = {
 export function Header({ onNewTransactionClick, onMenuClick, fluid = false }: HeaderProps) {
   const router = useRouter();
   const auth = useAuth();
+  const dataEnvironment = useDataEnvironment();
 
   async function handleLogout() {
     await logout();
     auth.setUnauthenticated();
+    dataEnvironment.reset();
     router.replace("/login");
   }
 
@@ -36,6 +40,7 @@ export function Header({ onNewTransactionClick, onMenuClick, fluid = false }: He
 
   return (
     <header className="sticky top-0 z-50 border-b border-neutral-200 bg-white">
+      <DataEnvironmentBanner />
       <div
         className={[
           "flex w-full items-center justify-between gap-4 px-4 py-3 sm:px-6 md:py-4",
@@ -119,17 +124,11 @@ export function Header({ onNewTransactionClick, onMenuClick, fluid = false }: He
                   Perfil
                 </Link>
               </DropdownMenuItem>
-              <DropdownMenuItem disabled className="items-start text-neutral-400 hover:bg-transparent">
-                <span className="mt-0.5 flex items-center">
+              <DropdownMenuItem>
+                <Link href="/settings" className="flex w-full items-center cursor-pointer">
                   <Settings className="mr-2 h-4 w-4" />
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-sm">Configurações</span>
-                  <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-700">
-                    <Hammer className="h-3 w-3" />
-                    Em construção
-                  </span>
-                </span>
+                  Configurações
+                </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleLogout} className="text-rose-600 hover:bg-rose-50 hover:text-rose-700">

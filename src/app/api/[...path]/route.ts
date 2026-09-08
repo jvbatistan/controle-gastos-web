@@ -27,10 +27,14 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   const contentType = request.headers.get("content-type");
   const cookie = request.headers.get("cookie");
   const accept = request.headers.get("accept");
+  const dataEnvironmentSwitch = request.headers.get("x-finch-data-environment-switch");
 
   if (contentType) headers.set("content-type", contentType);
   if (cookie) headers.set("cookie", cookie);
   if (accept) headers.set("accept", accept);
+  if (dataEnvironmentSwitch) {
+    headers.set("x-finch-data-environment-switch", dataEnvironmentSwitch);
+  }
 
   const backendResponse = await fetch(url, {
     method: request.method,
